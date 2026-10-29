@@ -62,17 +62,28 @@ export const KCH = {
 /** Singapore Changi (WSSS) runway 02C/20C: 4,000 m x 60 m, landing on 20C (heading 200°). */
 export const CHANGI_RWY = { heading: 200, length: 4000, width: 60 };
 
+/**
+ * About two minutes in the air. Turns are sized so they need no more than ~22° of bank at the
+ * planned speed (comfortable for passengers): r ≥ v² / (TURN_GAIN · g · tan 22°).
+ */
 export const ROUTE_LEGS: Leg[] = [
   { tag: 'runway', length: 450, alt: 0 },
-  { tag: 'climb', length: 800, alt: 140 },
-  { tag: 'turnout', length: 900, turn: 20, alt: 260 },
-  { tag: 'rainforest', length: 700, alt: 300 },
-  { tag: 'coast', length: 600, turn: -10, alt: 300 },
-  { tag: 'storm-in', length: 450, turn: 12, alt: 300 },
-  { tag: 'storm', length: 900, turn: -24, alt: 290 },
-  { tag: 'storm-out', length: 450, turn: 12, alt: 280 },
-  { tag: 'squall', length: 700, alt: 190 },
-  { tag: 'base', length: 1100, turn: -58, alt: 60 },
+  { tag: 'climb', length: 1100, alt: 110 },
+  // Right turn north over Kuching, then west along the Sarawak River towards the coast.
+  { tag: 'turnout', length: 2400, turn: 100, alt: 260 },
+  { tag: 'city', length: 1200, alt: 300 },
+  { tag: 'river', length: 2400, turn: -80, alt: 320 },
+  { tag: 'rainforest', length: 700, alt: 330 },
+  { tag: 'coast', length: 900, turn: -10, alt: 330 },
+  // Island-hopping over the South China Sea.
+  { tag: 'islands', length: 1000, turn: 9, alt: 320 },
+  { tag: 'islands-2', length: 1100, turn: -18, alt: 310 },
+  { tag: 'islands-3', length: 1000, turn: 9, alt: 300 },
+  { tag: 'storm-in', length: 750, turn: 12, alt: 300 },
+  { tag: 'storm', length: 1500, turn: -24, alt: 290 },
+  { tag: 'storm-out', length: 750, turn: 12, alt: 280 },
+  { tag: 'squall', length: 900, alt: 190 },
+  { tag: 'base', length: 1500, turn: -58, alt: 60 },
   { tag: 'final', length: 1150, alt: 0, linear: true }, // 60 m over 1,150 m = 3° glide path
   { tag: 'rollout', length: 1400, alt: 0 },
 ];
@@ -144,11 +155,34 @@ export class Route {
       this.stations[`${leg.tag}:end`] = s;
     }
     this.length = i * this.step;
+    this.smoothProfile();
 
     const aim = this.at(this.stations['final:end']);
     const d = dirFromHeading(CHANGI_RWY.heading);
     this.changiAim = { x: aim.x, y: 0, z: aim.z };
     this.changiThreshold = { x: aim.x - d.x * 300, y: 0, z: aim.z - d.z * 300 };
+  }
+
+  /**
+   * Blend the per-leg altitude ramps into one smooth climb/cruise/descent profile, so the auto-trim
+   * never asks for abrupt pitch changes. The runway, initial climb and the glide path are kept exact.
+   */
+  private smoothProfile(): void {
+    const a = Math.round((this.stations['climb:end'] ?? 0) / this.step);
+    const b = Math.round((this.stations['final'] ?? this.length) / this.step) - 40;
+    const r = 70; // ±350 m
+    for (let pass = 0; pass < 2; pass++) {
+      const src = this.ys.slice();
+      for (let k = a; k < b; k++) {
+        let sum = 0;
+        let n = 0;
+        for (let j = Math.max(0, k - r); j <= Math.min(this.ys.length - 1, k + r); j++) {
+          sum += src[j];
+          n++;
+        }
+        this.ys[k] = sum / n;
+      }
+    }
   }
 
   get count(): number {

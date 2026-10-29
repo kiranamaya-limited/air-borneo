@@ -1,19 +1,26 @@
-# AirBorneo · Fresh Cargo Run
+# AirBorneo · Connecting You
 
-A three.js flying game for AirBorneo. Fly an ATR 72-500 freighter carrying fresh Sarawak seafood and fruit from **Kuching (WBGG)** to **Singapore Changi (WSSS)**. Your phone is the control yoke and the game runs on a big screen (a laptop, TV or booth display).
+A three.js flying game for AirBorneo. **68 passengers** are flying home, to weddings, to meetings and on honeymoon. Fly AirBorneo flight 101, an ATR 72-500, from **Kuching (WBGG)** to **Singapore Changi (WSSS)**, and **keep them comfortable**. Your phone is the control yoke and the game runs on a big screen (a laptop, TV or booth display), with lounge music playing throughout.
 
-- **Take-off, like a real crew:** set flaps 15, push the throttle to TO, then tilt back to rotate at Vr (110 kt). Rotate too hard and you strike the tail.
-- **Fly the dotted line:** each marker scores by how close you pass: PERFECT, GOOD, OK or MISS. Staying tight builds a ×3 combo.
-- **Weather that pushes you off the line:**
-  - a gusty crosswind out of Kuching,
-  - rainforest updrafts,
-  - a cumulonimbus cell over the South China Sea (lightning, rain, heavy turbulence),
-  - a Sumatra squall,
-  - windshear on short final.
-- **Land on Changi 20C:** set flaps 30, follow the 3° glide path (the PAPI lights work), flare gently and pull the throttle to idle. Your landing is graded by sink rate in feet per minute.
-- **Results:** a score, a 1–5 star rating (Cadet → Borneo Ace), cargo freshness, and a personal best stored on the screen's browser.
+- **It starts straight away**, lined up on runway 25. Push the throttle to TO (flaps 15 are set for you if you forget), then tilt back gently to rotate at 110 kt.
+- **Passenger comfort is the score.** The cabin panel shows the passengers' faces and you hear them react:
+  - steep banks over 25° and jerky steering make them gasp ("My coffee!");
+  - sudden drops and lurches make them scream;
+  - long stretches of rough flying make someone **vomit** (a sick bag counts against you);
+  - wandering off the dotted line gets them nervous ("Is this the way to Singapore?");
+  - smooth flying earns happy sighs, and a butter landing gets applause.
+- **Controls are airliner-gentle:** roll is limited to about 12°/s and the phone input is smoothed. Small, steady tilts win.
+- **About 2 minutes of flying**, roughly 3 minutes from line-up to the results screen:
+  1. a right turn over Kuching city and the Sarawak River,
+  2. Mount Santubong and sea-breeze gusts along the coast,
+  3. island-hopping over the South China Sea,
+  4. a thunderstorm the route skirts round (stray into its core and the cabin suffers),
+  5. a Sumatra squall,
+  6. windshear on short final.
+- **Land on Changi 20C:** set flaps 30, follow the 3° glide path (the PAPI lights work), flare gently and pull the throttle to idle.
+- **Results:** stars from passenger comfort and the landing, ranked Trainee → First Officer → Captain → Senior Captain → **Smooth Operator**. They also show how many passengers had a lovely flight, how many needed sick bags, and the biggest complaint.
 
-About 60 seconds of steering, and about 1½ minutes from gate to gate.
+**Sound:** a synthesised bossa-nova lounge loop, wind gusts, rain, thunder, cabin chimes, the captain's PA, and passenger voices made with formant synthesis. No audio files.
 
 ## Play
 
@@ -24,14 +31,14 @@ About 60 seconds of steering, and about 1½ minutes from gate to gate.
 
 | Phone control | Does |
 | --- | --- |
-| Tilt left/right (steering wheel) | Bank, up to 35° |
+| Tilt left/right (steering wheel) | Bank, up to 35°. Keep it under 25° for the passengers |
 | Tilt top edge towards / away from you | Nose up / down |
 | Throttle lever (left thumb) | IDLE · CLB · TO detents |
 | FLAPS (right thumb) | 0 → 15 → 30 |
-| Action | Skip the intro / fly again |
+| Action | Start / fly again |
 | Re-centre | Re-calibrate the neutral pose |
 
-**No phone?** Click "Fly with keyboard" or press **K** or **Space** on the title screen:
+**No phone?** Press any key on the title screen, or click "Fly with keyboard":
 
 | Key | Does |
 | --- | --- |
@@ -78,9 +85,10 @@ npm install
 npm run demo
 ```
 
-`npm run demo` builds the game and serves it over HTTPS on your Wi-Fi with its own pairing server, then opens the big screen in your browser.
-- Phones on the same Wi-Fi scan the QR code.
-- The certificate is self-signed, so tap **Advanced → Proceed** once on each device.
+`npm run demo` builds the game and serves it over HTTPS on your Wi-Fi with its own pairing server, then opens the big screen.
+- If Google Chrome is installed, the big screen opens in its own Chrome demo profile: fullscreen, music on with no click, no certificate warning. Press ⌘⌃F to leave fullscreen.
+- Without Chrome, the default browser opens instead. Press any key once for sound.
+- Phones on the same Wi-Fi scan the QR code. The certificate is self-signed, so tap **Advanced → Proceed** once on each phone.
 - If macOS asks whether to accept incoming network connections, choose **Allow**.
 
 To change the port, set `PORT=9443 npm run demo`. The default is 8443.
@@ -93,7 +101,7 @@ npm install
 npm run dist
 ```
 
-`npm run dist` builds `desktop/dist/AirBorneo Fresh Cargo Run-<version>.dmg`. The app starts the same offline server inside itself and opens the game fullscreen. To try it without packaging, use `npm start` instead.
+`npm run dist` builds `desktop/dist/AirBorneo Connecting You-<version>.dmg`. The app starts the same offline server inside itself and opens the game fullscreen. To try it without packaging, use `npm start` instead.
 
 The app is unsigned, so the first time you open it:
 1. Right-click the app → **Open** → **Open**.

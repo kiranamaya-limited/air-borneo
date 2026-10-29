@@ -109,12 +109,12 @@ export class WeatherSystem {
     wx += base.x * 4;
     wz += base.z * 4;
 
-    // 1. Gusty crosswind on the climb-out.
-    const xw = ramp(s, st['turnout'] + 200, st['rainforest'] + 300, 250);
+    // 1. Gusty crosswind on the climb-out over Kuching.
+    const xw = ramp(s, st['turnout'] + 600, st['city:end'] + 200, 300);
     if (xw > 0) {
       const gust = Math.max(0, this.gustNoise.at(t)) * 6;
       const to = dirFromHeading(130);
-      const speed = (12 + gust) * xw;
+      const speed = (9 + gust * 0.8) * xw;
       wx += to.x * speed;
       wz += to.z * speed;
       turb = Math.max(turb, 0.3 * xw);
@@ -124,12 +124,27 @@ export class WeatherSystem {
       if (xw > 0.3) alert = { id: 'xwind', text: `CROSSWIND  310° / ${windKt} KT  G${gustKt}`, level: 'caution' };
     }
 
-    // 2. Convective up/downdrafts over the rainforest.
-    const th = ramp(s, st['rainforest'] - 100, st['coast'] + 200, 200);
+    // 2. Convective up/downdrafts over the river and rainforest.
+    const th = ramp(s, st['river'] + 900, st['coast'] + 100, 250);
     if (th > 0) {
-      wy += Math.sin(s / 140 + this.thermalPhase) * 6.5 * th;
-      turb = Math.max(turb, 0.4 * th);
+      wy += Math.sin(s / 260 + this.thermalPhase) * 3.2 * th;
+      turb = Math.max(turb, 0.36 * th);
       if (!alert) alert = { id: 'thermals', text: 'CONVECTIVE UP & DOWNDRAFTS', level: 'caution' };
+    }
+
+    // 2b. Sea-breeze gusts along the Santubong coast, from the north-west.
+    const sb = ramp(s, st['coast'] + 200, st['islands'] + 400, 250);
+    if (sb > 0) {
+      const gust = Math.max(0, this.gustNoise.at(t * 1.6)) * 7;
+      const to = dirFromHeading(135);
+      const speed = (8 + gust) * sb;
+      wx += to.x * speed;
+      wz += to.z * speed;
+      turb = Math.max(turb, 0.38 * sb);
+      windFrom = 315;
+      windKt = Math.round(16 * sb + 8 * (1 - sb));
+      gustKt = Math.round((16 + gust * KT) * sb);
+      if (sb > 0.3) alert = { id: 'seabreeze', text: `SEA BREEZE GUSTS  315° / ${windKt} KT  G${gustKt}`, level: 'caution' };
     }
 
     // 3. Cumulonimbus: turbulence, inflow towards the core, rain, lightning.
@@ -137,7 +152,7 @@ export class WeatherSystem {
     const coreDist = Math.hypot(toCore.x, toCore.z);
     const near = Math.max(0, 1 - coreDist / (this.stormRadius * 1.6));
     if (near > 0) {
-      const inflow = 9 * near;
+      const inflow = 5 * near;
       wx += (toCore.x / coreDist) * inflow;
       wz += (toCore.z / coreDist) * inflow;
       wy += -3 * near + Math.sin(t * 0.7) * 2.5 * near;
@@ -156,7 +171,7 @@ export class WeatherSystem {
     if (sq > 0) {
       const gust = Math.max(0, this.gustNoise.at(t * 1.3)) * 7;
       const to = dirFromHeading(40);
-      const speed = (13 + gust) * sq;
+      const speed = (9 + gust * 0.7) * sq;
       wx += to.x * speed;
       wz += to.z * speed;
       turb = Math.max(turb, 0.45 * sq);
@@ -174,12 +189,12 @@ export class WeatherSystem {
     if (s > wsA - 350 && s < wsA) alert = { id: 'ws-ahead', text: 'WINDSHEAR AHEAD', level: 'caution' };
     if (s >= wsA && s <= wsB) {
       const k = (s - wsA) / (wsB - wsA);
-      wy += k < 0.3 ? 3 * Math.sin((k / 0.3) * Math.PI) : -5.5 * Math.sin(((k - 0.3) / 0.7) * Math.PI);
+      wy += k < 0.3 ? 2.2 * Math.sin((k / 0.3) * Math.PI) : -4 * Math.sin(((k - 0.3) / 0.7) * Math.PI);
       turb = Math.max(turb, 0.35);
       alert = { id: 'windshear', text: 'WINDSHEAR', level: 'warning' };
     }
 
-    const rollAmp = 2 + turb * 13;
+    const rollAmp = 1.5 + turb * 7;
     const rollDisturb = this.rollNoise.at(t) * rollAmp * turb;
     const pitchDisturb = this.pitchNoise.at(t) * (0.6 + turb * 3) * turb;
 

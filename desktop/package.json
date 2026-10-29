@@ -1,8 +1,8 @@
 {
   "name": "airborneo-desktop",
-  "productName": "AirBorneo Fresh Cargo Run",
+  "productName": "AirBorneo Connecting You",
   "version": "0.1.0",
-  "description": "Offline Mac app for the AirBorneo Fresh Cargo Run demo.",
+  "description": "Offline Mac app for the AirBorneo Connecting You demo.",
   "private": true,
   "main": "main.cjs",
   "scripts": {
@@ -20,14 +20,14 @@
     "electron-builder": "^26.0.0"
   },
   "build": {
-    "appId": "com.airborneo.freshcargorun",
-    "productName": "AirBorneo Fresh Cargo Run",
+    "appId": "com.airborneo.connectingyou",
+    "productName": "AirBorneo Connecting You",
     "files": ["main.cjs", "serve.mjs", "app/**/*", "package.json"],
     "mac": {
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
       "category": "public.app-category.games",
       "identity": null
     },
-    "dmg": { "title": "AirBorneo Fresh Cargo Run" }
+    "dmg": { "title": "AirBorneo Connecting You" }
   }
 }

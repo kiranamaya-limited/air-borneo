@@ -1,5 +1,5 @@
 /**
- * AirBorneo Fresh Cargo Run — offline Mac app.
+ * AirBorneo Connecting You — offline Mac app.
  *
  * Starts the demo server (game + PeerJS pairing over HTTPS on the local Wi-Fi) inside the app and
  * shows the big-screen game fullscreen. Phones on the same Wi-Fi scan the QR code as usual.
@@ -27,7 +27,7 @@ async function createWindow() {
     height: 900,
     fullscreen: true,
     backgroundColor: '#ffffff',
-    title: 'AirBorneo Fresh Cargo Run',
+    title: 'AirBorneo Connecting You',
     webPreferences: { contextIsolation: true },
   });
   win.loadURL(serverUrl);

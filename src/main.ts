@@ -1,6 +1,7 @@
 import './brand/brand.css';
 import './ui/hud.css';
 import { Mission, type MissionEvent } from './game/mission';
+import { COMPLAINTS } from './game/comfort';
 import { autopilot } from './game/autopilot';
 import type { FlightInput } from './game/flight';
 import { World } from './world/world';
@@ -50,6 +51,8 @@ async function boot(): Promise<void> {
   const hud = new Hud(mission);
   const screens = new Screens();
   const audio = new GameAudio();
+  // Start the lounge music straight away where autoplay is allowed; otherwise on the first key or tap.
+  audio.init();
 
   // ------------------------------------------------------------------ input
   let mode: 'phone' | 'keyboard' | null = null;
@@ -99,7 +102,7 @@ async function boot(): Promise<void> {
       phone.cal = msg.cal;
       if (mode === null) mode = 'phone';
       if (mode === 'phone' && msg.cal && mission.phase === 'pairing' && !startTimer) {
-        startTimer = window.setTimeout(startMission, 1500);
+        startTimer = window.setTimeout(startMission, 50); // straight in, no countdown
       }
     } else if (msg.t === 'btn') {
       if (msg.b === 'flaps') mission.flapsPress();
@@ -115,6 +118,13 @@ async function boot(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     audio.unlock();
     keys.add(e.code);
+    // On the title screen, any key (except mute) starts a keyboard flight straight away.
+    if (mission.phase === 'pairing' && e.code !== 'KeyM' && mode !== 'phone') {
+      mode = 'keyboard';
+      startMission();
+      e.preventDefault();
+      return;
+    }
     if (e.code === 'Space' || e.code === 'Enter') {
       if (mission.phase === 'pairing') {
         mode = 'keyboard';
@@ -145,8 +155,6 @@ async function boot(): Promise<void> {
     audio.unlock();
     startMission();
   });
-  const soundBtn = document.getElementById('sound-btn')!;
-  soundBtn.addEventListener('click', () => audio.unlock());
 
   function keyboardInput(dt: number): void {
     const left = keys.has('ArrowLeft') || keys.has('KeyA');
@@ -171,7 +179,7 @@ async function boot(): Promise<void> {
     lastState = key;
     lastSent = now;
     const prompt = mission.phase === 'pairing' ? (phone.cal ? 'Starting…' : 'Calibrate to start') : mission.prompt;
-    link.send({ t: 'state', phase: mission.phase, prompt, want: mission.want, flaps: mission.ac.flaps, score: mission.scorer.score });
+    link.send({ t: 'state', phase: mission.phase, prompt, want: mission.want, flaps: mission.ac.flaps, score: mission.scorer.score, comfort: Math.round(mission.comfort) });
   }
 
   // ------------------------------------------------------------------ events
@@ -188,7 +196,7 @@ async function boot(): Promise<void> {
         break;
       case 'callout':
         hud.showCallout(e.text);
-        audio.speak(e.speak ?? e.text);
+        audio.speak(e.speak ?? e.text, 'callout');
         break;
       case 'atc':
         hud.showAtc(e.text);
@@ -213,6 +221,20 @@ async function boot(): Promise<void> {
       case 'haptic':
         link.send({ t: 'haptic', pattern: e.pattern });
         break;
+      case 'reaction':
+        hud.cabin.react(e.kind, e.text);
+        audio.passengers(e.kind);
+        break;
+      case 'story':
+        hud.cabin.tell(e.text);
+        break;
+      case 'pa':
+        hud.showAtc(`📢 ${e.text}`);
+        audio.speak(e.text, 'pa');
+        break;
+      case 'chime':
+        audio.cabinChime();
+        break;
       default:
         break;
     }
@@ -226,9 +248,11 @@ async function boot(): Promise<void> {
       const best = readBest();
       const newBest = sum.score > best;
       if (newBest) writeBest(sum.score);
-      window.setTimeout(() => screens.showResults(sum, Math.max(best, sum.score), newBest, mission.crashReason), phase === 'crashed' ? 1200 : 300);
+      const complaint = mission.scorer.comfort.biggestComplaint();
+      window.setTimeout(() => screens.showResults(sum, Math.max(best, sum.score), newBest, mission.crashReason, complaint ? COMPLAINTS[complaint] : null), phase === 'crashed' ? 1200 : 1500);
       link.send({ t: 'result', score: sum.score, stars: sum.stars, rank: sum.crashed ? mission.crashReason : sum.rank, best: Math.max(best, sum.score) });
     } else screens.hideResults();
+    if (phase === 'lineup') hud.cabin.reset();
     sendState(true);
   }
 
@@ -284,8 +308,9 @@ async function boot(): Promise<void> {
       speed: mission.ac.speed,
       rain: ['flight', 'flare'].includes(mission.phase) ? mission.wx.rain : 0,
       warning: mission.alert?.level === 'warning',
+      turb: ['flight', 'flare'].includes(mission.phase) ? mission.wx.turb : 0,
+      gust: ['flight', 'flare'].includes(mission.phase) ? Math.min(1, Math.max(0, mission.wx.gustKt - mission.wx.windKt) / 15) : 0,
     });
-    soundBtn.classList.toggle('hidden', audio.unlocked || ['pairing', 'results', 'crashed'].includes(mission.phase));
     sendState();
     world.render();
     requestAnimationFrame(frame);
@@ -304,6 +329,9 @@ async function boot(): Promise<void> {
     },
     get input() {
       return input;
+    },
+    get audio() {
+      return audio.state;
     },
     get paused() {
       return !document.getElementById('paused')!.classList.contains('hidden');

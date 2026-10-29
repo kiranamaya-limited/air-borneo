@@ -45,7 +45,7 @@ function check(cond, label) {
   if (!cond) failures.push(label);
 }
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--proxy-server=direct://'] });
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--proxy-server=direct://', '--autoplay-policy=no-user-gesture-required'] });
 try {
   const screenCtx = await browser.newContext({ viewport: { width: 960, height: 540 }, ignoreHTTPSErrors: true });
   const screen = await screenCtx.newPage();
@@ -56,6 +56,9 @@ try {
   await screen.waitForFunction(() => document.querySelector('#pair-status')?.textContent?.includes('Waiting'), null, { timeout: 30000 });
   const code = await screen.evaluate(() => window.__game.code.toUpperCase());
   check(/^[A-Z0-9]{5}$/.test(code), `screen shows a pairing code (${code})`);
+  await screen.waitForTimeout(1500);
+  const sound = await screen.evaluate(() => window.__game.audio);
+  check(sound.context === 'running' && sound.music, `lounge music plays without a click (${JSON.stringify(sound)})`);
   await screen.screenshot({ path: `${SHOTS}/01-title.png` });
 
   const phoneCtx = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true, deviceScaleFactor: 2 });
@@ -92,13 +95,11 @@ try {
   check(true, 'phone connected to the screen over WebRTC');
   await phone.screenshot({ path: `${SHOTS}/02-phone-calibrate.png` });
   await phone.click('#calibrate-btn');
-  await screen.waitForFunction(() => window.__game.mission.phase === 'intro', null, { timeout: 30000 });
-  check(true, 'calibrating starts the mission (intro)');
-
-  await phone.click('#action-btn');
   await screen.waitForFunction(() => window.__game.mission.phase === 'lineup', null, { timeout: 30000 });
-  check(true, 'phone Action skips the intro to line-up');
-  await phone.click('#flaps-btn');
+  check(true, 'calibrating puts you straight on the runway (no cutscene)');
+  check(await screen.evaluate(() => !document.getElementById('sound-btn')), 'no "Click for sound" button');
+
+  await phone.click('#flaps-btn', { force: true }); // it pulses while it's the next action
   await screen.waitForFunction(() => window.__game.mission.ac.flaps === 15, null, { timeout: 15000 });
   check(true, 'phone FLAPS button sets flaps 15');
 
@@ -112,13 +113,13 @@ try {
   check(true, 'throttle lever to TO starts the take-off roll');
   await phone.screenshot({ path: `${SHOTS}/03-phone-fly.png` });
 
-  await setTilt(phone, 20, 0);
+  await setTilt(phone, 30, 0);
   await screen.waitForFunction(() => window.__game.input.roll > 0.3, null, { timeout: 10000 });
   check(true, 'tilting the phone right reaches the game as right roll');
   await setTilt(phone, 0, 0);
 
   await screen.waitForFunction(() => window.__game.mission.ac.speed > 58, null, { timeout: 120000 });
-  await setTilt(phone, 0, 10);
+  await setTilt(phone, 0, 15);
   await screen.waitForFunction(() => window.__game.mission.phase === 'flight', null, { timeout: 60000 });
   check(true, 'tilting back at Vr rotates and lifts off');
   await setTilt(phone, 0, 0);
@@ -137,7 +138,11 @@ try {
   await phone.click('#calibrate-btn');
 
   // Fly the rest by autopilot in fast-forward, with stills along the way.
-  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['storm'] + 300));
+  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['city'] + 500));
+  await screen.screenshot({ path: `${SHOTS}/06-kuching.png` });
+  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['islands-2'] + 300));
+  await screen.screenshot({ path: `${SHOTS}/06-islands.png` });
+  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['storm'] + 500));
   await screen.screenshot({ path: `${SHOTS}/06-storm.png` });
   const phase = await screen.evaluate(() => window.__game.fastForward(200, (m) => m.phase === 'results' || m.phase === 'crashed'));
   check(phase === 'results', `mission reaches results (${phase})`);
@@ -145,6 +150,10 @@ try {
   await screen.screenshot({ path: `${SHOTS}/07-results.png` });
   const stars = await screen.textContent('#res-stars');
   check(/★/.test(stars ?? ''), `results show a star rating (${stars})`);
+  const note = await screen.textContent('#res-note');
+  check(/passengers had a lovely flight/.test(note ?? ''), `results talk about the passengers (${note?.slice(0, 60)}…)`);
+  const seats = await screen.evaluate(() => document.querySelectorAll('#cabin-seats span').length);
+  check(seats === 10, 'cabin panel shows the passengers');
   await phone.waitForFunction(() => /★|☆/.test(document.getElementById('prompt').textContent), null, { timeout: 15000 });
   check(true, 'phone receives the result');
   await phone.screenshot({ path: `${SHOTS}/08-phone-result.png` });

@@ -1,8 +1,15 @@
 /**
- * Synthesised sound: PW127 turboprop drone, wind, rain, thunder, marker chimes, cockpit alerts.
- * Callouts ("V1", "Rotate", radio-altimeter countdown) use the browser's speech synthesis.
+ * Synthesised sound: lounge music, PW127 turboprop drone, wind gusts, rain, thunder, passenger
+ * reactions, cabin chimes, marker chimes and cockpit alerts. Callouts and the captain's PA use the
+ * browser's speech synthesis.
+ *
+ * Audio starts without a click wherever the browser allows it (the Mac app and the demo launcher
+ * enable autoplay); otherwise it starts silently on the first key press or tap.
  */
 import type { Grade } from '../game/scoring';
+import type { Reaction } from '../game/comfort';
+import { LoungeMusic } from './music';
+import { PassengerVoices } from './passengers';
 
 export class GameAudio {
   private ctx?: AudioContext;
@@ -19,17 +26,32 @@ export class GameAudio {
   private noise!: AudioBuffer;
   private warnTimer = 0;
   private voice?: SpeechSynthesisVoice;
+  private music?: LoungeMusic;
+  private voices?: PassengerVoices;
+  private paSpeaking = false;
+  private gustPhase = 0;
   muted = false;
+
+  /** For tests: is sound running, and is the lounge music playing? */
+  get state(): { context: string; music: boolean } {
+    return { context: this.ctx?.state ?? 'none', music: !!this.music?.isPlaying };
+  }
 
   get unlocked(): boolean {
     return !!this.ctx && this.ctx.state === 'running';
   }
 
-  /** Must be called from a user gesture. */
-  unlock(): void {
+  /** Create the audio graph and try to start straight away (no click needed where autoplay is allowed). */
+  init(): void {
     if (!this.ctx) this.build();
-    void this.ctx?.resume();
     this.pickVoice();
+    void this.ctx?.resume().then(() => this.music?.start());
+    this.music?.start();
+  }
+
+  /** Called on any key press / tap: resumes audio if the browser held it back. */
+  unlock(): void {
+    this.init();
   }
 
   private build(): void {
@@ -103,6 +125,9 @@ export class GameAudio {
     this.rainGain = ctx.createGain();
     this.rainGain.gain.value = 0;
     loop().connect(rainFilter).connect(this.rainGain).connect(this.master);
+
+    this.music = new LoungeMusic(ctx, this.master, this.noise);
+    this.voices = new PassengerVoices(ctx, this.master, this.noise);
   }
 
   private pickVoice(): void {
@@ -115,21 +140,29 @@ export class GameAudio {
     speechSynthesis.onvoiceschanged = choose;
   }
 
-  update(dt: number, s: { prop: number; speed: number; rain: number; warning: boolean }): void {
+  update(dt: number, s: { prop: number; speed: number; rain: number; warning: boolean; turb: number; gust: number }): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
     const k = 0.15;
+    // The engines sit under the music: present, not dominant.
     const blade = 38 + s.prop * 78;
     this.propOsc.frequency.setTargetAtTime(blade, t, k);
     this.propOsc2.frequency.setTargetAtTime(blade * 2.01, t, k);
-    this.propGain.gain.setTargetAtTime(this.muted ? 0 : 0.05 + s.prop * 0.16, t, k);
+    this.propGain.gain.setTargetAtTime(this.muted ? 0 : 0.03 + s.prop * 0.08, t, k);
     this.whine.frequency.setTargetAtTime(1500 + s.prop * 1600, t, k);
-    this.whineGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.012, t, k);
-    this.washGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.14, t, k);
-    this.windFilter.frequency.setTargetAtTime(250 + s.speed * 5, t, k);
-    this.windGain.gain.setTargetAtTime(this.muted ? 0 : Math.min(0.22, s.speed / 1000), t, k);
-    this.rainGain.gain.setTargetAtTime(this.muted ? 0 : s.rain * 0.16, t, 0.4);
+    this.whineGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.007, t, k);
+    this.washGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.07, t, k);
+    // Wind swells with gusts and rough air.
+    this.gustPhase += dt * (0.6 + s.turb * 2.5);
+    const swell = 1 + s.gust * 0.9 * (0.5 + 0.5 * Math.sin(this.gustPhase)) + s.turb * 0.6 * Math.abs(Math.sin(this.gustPhase * 2.3));
+    this.windFilter.frequency.setTargetAtTime((250 + s.speed * 5) * (0.8 + 0.4 * swell), t, k);
+    this.windGain.gain.setTargetAtTime(this.muted ? 0 : Math.min(0.32, (s.speed / 1100) * swell), t, k);
+    this.rainGain.gain.setTargetAtTime(this.muted ? 0 : s.rain * 0.2, t, 0.4);
+    this.music?.setStorm(Math.max(s.rain, s.turb > 0.5 ? s.turb - 0.3 : 0));
+    this.music?.out.gain.setTargetAtTime(this.muted ? 0 : 0.22, t, 0.3);
+    // A whoosh now and then when it's bumpy.
+    if (s.turb > 0.45 && Math.random() < dt * s.turb * 0.9) this.burst(0.9, 'bandpass', 500 + Math.random() * 600, 0.12 * s.turb, 0, 0.8);
 
     this.warnTimer -= dt;
     if (s.warning && this.warnTimer <= 0) {
@@ -204,18 +237,39 @@ export class GameAudio {
     this.burst(0.12, 'highpass', 3000, 0.05);
   }
 
-  speak(text: string, rate = 1.05): void {
+  /** Cockpit callouts are short and may interrupt each other; the captain's PA is never cut off. */
+  speak(text: string, kind: 'callout' | 'pa' = 'callout'): void {
     if (this.muted || !('speechSynthesis' in window)) return;
+    if (kind === 'callout' && this.paSpeaking) return;
     try {
       const u = new SpeechSynthesisUtterance(text);
       if (this.voice) u.voice = this.voice;
-      u.rate = rate;
-      u.pitch = 0.9;
+      u.rate = kind === 'pa' ? 0.98 : 1.05;
+      u.pitch = kind === 'pa' ? 0.8 : 0.95;
       u.volume = 0.9;
-      speechSynthesis.cancel();
+      if (kind === 'pa') {
+        this.paSpeaking = true;
+        u.onend = u.onerror = () => (this.paSpeaking = false);
+        this.music?.duck(0.3, Math.max(3, text.length / 14));
+      } else speechSynthesis.cancel();
       speechSynthesis.speak(u);
     } catch {
       /* speech not available */
     }
+  }
+
+  /** The cabin "ding-dong". */
+  cabinChime(): void {
+    this.beep(698, 1.2, 'sine', 0.11);
+    this.beep(1396, 0.5, 'sine', 0.03);
+    this.beep(554, 1.4, 'sine', 0.11, 0.55);
+    this.beep(1108, 0.5, 'sine', 0.03, 0.55);
+  }
+
+  /** Passengers react out loud. */
+  passengers(kind: Reaction): void {
+    if (this.muted || !this.voices) return;
+    this.voices.react(kind);
+    if (kind !== 'happy') this.music?.duck(0.55, 1.8);
   }
 }

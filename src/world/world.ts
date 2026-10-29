@@ -13,7 +13,6 @@ import { MarkerTrail } from './markers';
 import { Ocean } from './ocean';
 import { buildTerrain } from './terrain';
 import { Lightning, Rain } from './weather';
-import { brand } from '../brand/tokens';
 
 export class World {
   readonly renderer: THREE.WebGLRenderer;
@@ -27,8 +26,6 @@ export class World {
   private readonly markers: MarkerTrail;
   private readonly rain = new Rain();
   private readonly lightning: Lightning;
-  private readonly cargo: THREE.Mesh[] = [];
-  private unloadTime = -1;
 
   constructor(canvas: HTMLCanvasElement, private readonly mission: Mission, private quality: 'high' | 'low' = 'high') {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
@@ -58,16 +55,6 @@ export class World {
     this.lightning = new Lightning(mission.weather.stormCore);
     this.scene.add(this.lightning.group);
     this.scene.add(this.plane.root);
-
-    // Fresh-produce containers for the unloading scene at Changi.
-    const uldMats = [brand.colors.white, '#e8eef3', brand.colors.yellow].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.2 }));
-    for (let i = 0; i < 4; i++) {
-      const uld = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.6, 2.0), uldMats[i % uldMats.length]);
-      uld.castShadow = true;
-      uld.visible = false;
-      this.cargo.push(uld);
-      this.scene.add(uld);
-    }
 
     window.addEventListener('resize', () => this.resize());
   }
@@ -101,14 +88,7 @@ export class World {
     if (e.type === 'touchdown') this.rig.bump(e.grade === 'Hard' ? 1.6 : 0.5);
     if (e.type === 'tailstrike') this.rig.bump(1.2);
     if (e.type === 'crash') this.rig.bump(3);
-    if (e.type === 'phase' && e.phase === 'intro') this.markers.reset();
-    if (e.type === 'phase') {
-      this.unloadTime = e.phase === 'results' ? 0 : -1;
-      if (e.phase !== 'results') {
-        this.plane.setCargoDoor(0);
-        for (const c of this.cargo) c.visible = false;
-      }
-    }
+    if (e.type === 'phase' && e.phase === 'lineup') this.markers.reset();
   }
 
   update(dt: number, time: number, input: Pick<FlightInput, 'roll' | 'pitch'>): void {
@@ -125,28 +105,6 @@ export class World {
     this.lightning.update(dt);
     this.airports.update(time, m.ac);
     this.markers.update(dt, cam, m.nextMarker);
-    this.updateUnload(dt);
-  }
-
-  private updateUnload(dt: number): void {
-    if (this.unloadTime < 0) return;
-    this.unloadTime += dt;
-    const t = this.unloadTime;
-    this.plane.setCargoDoor(Math.min(1, t / 1.5));
-    const body = this.plane.body;
-    body.updateWorldMatrix(true, false);
-    const door = body.localToWorld(new THREE.Vector3(-1.2, -0.7, -9.35));
-    const out = new THREE.Vector3(-1, 0, 0).transformDirection(body.matrixWorld);
-    const along = new THREE.Vector3(0, 0, 1).transformDirection(body.matrixWorld);
-    this.cargo.forEach((c, i) => {
-      const start = 1.6 + i * 1.3;
-      const k = THREE.MathUtils.clamp((t - start) / 1.6, 0, 1);
-      c.visible = t > start;
-      const ease = k * k * (3 - 2 * k);
-      c.position.copy(door).addScaledVector(out, 1 + ease * 7).addScaledVector(along, ease * (i * 2.4 - 3));
-      c.position.y = Math.max(0.8, door.y - ease * (door.y - 0.8));
-      c.quaternion.copy(this.plane.root.quaternion);
-    });
   }
 
   render(): void {

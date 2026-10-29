@@ -4,6 +4,7 @@ import { altitudeFt, ias, verticalSpeedFpm } from '../game/flight';
 import type { Mission } from '../game/mission';
 import type { Grade } from '../game/scoring';
 import type { LinkStatus } from '../net/link';
+import { Cabin, comfortFace } from './cabin';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -16,9 +17,11 @@ export class Hud {
   private readonly stage = $('hud-stage');
   private readonly score = $('hud-score');
   private readonly mult = $('hud-mult');
-  private readonly accuracy = $('hud-accuracy');
+  private readonly comfortVal = $('hud-comfort');
+  private readonly comfortBar = $('hud-comfort-bar');
+  private readonly face = $('hud-face');
+  readonly cabin = new Cabin();
   private readonly dev = $('hud-dev');
-  private readonly fresh = $('hud-fresh');
   private readonly prompt = $('hud-prompt');
   private readonly callout = $('hud-callout');
   private readonly alert = $('hud-alert');
@@ -36,6 +39,7 @@ export class Hud {
   private readonly altTape = $<HTMLCanvasElement>('alt-tape');
   private readonly hdgTape = $<HTMLCanvasElement>('heading-tape');
   private calloutTimer = 0;
+  private radioTimer = 0;
   private popupTimer = 0;
   private pending: { grade: Grade; points: number } | null = null;
   private lastMult = 1;
@@ -47,8 +51,9 @@ export class Hud {
     const st = mission.route.stations;
     const span = st['final:end'] - st['climb'];
     for (const [s, icon, label] of [
-      [st['turnout'] + 400, '💨', 'Crosswind'],
-      [st['rainforest'] + 300, '☁️', 'Updrafts'],
+      [st['turnout'] + 900, '💨', 'Crosswind over Kuching'],
+      [st['river'] + 1600, '☁️', 'Updrafts'],
+      [st['coast'] + 400, '🌊', 'Sea-breeze gusts'],
       [st['storm'] + 400, '⛈️', 'Thunderstorm'],
       [st['squall'] + 300, '🌧️', 'Sumatra squall'],
       [st['final'] + 600, '⚠️', 'Windshear'],
@@ -96,8 +101,9 @@ export class Hud {
 
   showAtc(text: string): void {
     setText(this.atc, text);
-    this.radio.classList.add('flash');
-    window.setTimeout(() => this.radio.classList.remove('flash'), 1200);
+    this.radio.classList.add('show');
+    window.clearTimeout(this.radioTimer);
+    this.radioTimer = window.setTimeout(() => this.radio.classList.remove('show'), 7000);
   }
 
   linkStatus(status: LinkStatus | 'keyboard', stale: boolean): void {
@@ -113,7 +119,6 @@ export class Hud {
 
   update(m: Mission): void {
     const ac = m.ac;
-    this.root.classList.toggle('cinematic', m.phase === 'intro' || m.phase === 'taxiIn');
     setText(this.stage, m.stage);
     setText(this.score, m.scorer.score.toLocaleString());
     const mult = m.scorer.multiplier;
@@ -124,11 +129,14 @@ export class Hud {
       this.lastMult = mult;
     }
     const inFlight = m.phase === 'flight' || m.phase === 'flare';
-    const acc = inFlight ? Math.max(0, 1 - m.track.dist / 40) : 0;
-    this.accuracy.style.width = `${acc * 100}%`;
-    this.accuracy.style.background = acc > 0.8 ? brand.colors.good : acc > 0.5 ? brand.colors.yellow : brand.colors.red;
     setText(this.dev, inFlight ? `${Math.round(m.track.dist)} m` : '–');
-    setText(this.fresh, `${Math.round(m.scorer.freshness)}%`);
+    const c = m.comfort;
+    setText(this.comfortVal, `${Math.round(c)}%`);
+    this.comfortVal.className = `score-value mono${c < 50 ? ' bad' : c < 75 ? ' warn' : ''}`;
+    this.comfortBar.style.width = `${c}%`;
+    this.comfortBar.style.background = c > 75 ? brand.colors.good : c > 50 ? brand.colors.yellow : brand.colors.red;
+    setText(this.face, comfortFace(c));
+    this.cabin.update(c, m.scorer.comfort.sickBags);
 
     setText(this.prompt, m.prompt);
     this.prompt.classList.toggle('urgent', m.want === 'pitch-up' || m.want === 'flaps' || m.want === 'throttle-up' || m.want === 'throttle-idle');

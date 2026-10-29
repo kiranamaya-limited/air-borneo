@@ -487,7 +487,7 @@ export class Airports {
     // Parked jets at the terminal.
     for (let i = 0; i < 5; i++) g.add(genericJet(f, T.u0 + 120 + i * 230, T.v0 - 50));
 
-    // Cold-chain truck and ULD dollies waiting at the cargo stand.
+    // An AirBorneo ground vehicle waiting on the apron.
     const truck = new THREE.Group();
     const cabMat = new THREE.MeshStandardMaterial({ color: brand.colors.red, roughness: 0.5 });
     const reefer = canvasTexture(512, 128, (ctx) => {
@@ -501,7 +501,7 @@ export class Airports {
       ctx.fillRect(0, 112, 512, 8);
       ctx.fillStyle = brand.colors.ink;
       ctx.font = `800 40px ${brand.fonts.ui}`;
-      ctx.fillText('Fresh from Sarawak', 24, 60);
+      ctx.fillText('AirBorneo · Connecting You', 24, 60);
     });
     const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3, 9), [new THREE.MeshStandardMaterial({ map: reefer }), new THREE.MeshStandardMaterial({ map: reefer }), plain, plain, plain, plain]);
     body.position.set(0, 2.2, 0);

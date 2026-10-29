@@ -2,7 +2,7 @@
   "name": "air-borneo",
   "private": true,
   "version": "0.1.0",
-  "description": "AirBorneo Fresh Cargo Run: fly an ATR from Kuching to Singapore with your phone as the yoke.",
+  "description": "AirBorneo Connecting You: fly 68 passengers from Kuching to Singapore with your phone as the yoke, and keep them comfortable.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

@@ -38,7 +38,7 @@ async function certificate(host, dir) {
   if (existsSync(keyFile) && existsSync(certFile)) {
     return { key: readFileSync(keyFile), cert: readFileSync(certFile) };
   }
-  const pems = await selfsigned.generate([{ name: 'commonName', value: 'AirBorneo Fresh Cargo Run' }], {
+  const pems = await selfsigned.generate([{ name: 'commonName', value: 'AirBorneo Connecting You' }], {
     days: 825,
     keySize: 2048,
     algorithm: 'sha256',
@@ -82,17 +82,49 @@ export async function startServer({ distDir, port = Number(process.env.PORT) || 
   return { url, host, port, close: () => server.close() };
 }
 
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+/**
+ * Open the big screen. On a Mac with Google Chrome, use a dedicated demo profile that lets the
+ * lounge music start without a click, trusts this machine's self-signed certificate and opens
+ * fullscreen. Otherwise fall back to the default browser.
+ */
+function openBigScreen(url) {
+  if (existsSync(CHROME)) {
+    const profile = join(homedir(), '.airborneo', 'chrome');
+    mkdirSync(profile, { recursive: true });
+    spawn(
+      CHROME,
+      [
+        `--user-data-dir=${profile}`,
+        '--autoplay-policy=no-user-gesture-required',
+        '--ignore-certificate-errors',
+        '--test-type',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--start-fullscreen',
+        url,
+      ],
+      { stdio: 'ignore', detached: true },
+    ).unref();
+    console.log('  Opened the big screen in Google Chrome (sound on, fullscreen). Press ⌘⌃F to leave fullscreen.\n');
+  } else {
+    spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
+    console.log('  Tip: install Google Chrome for automatic sound; otherwise press any key once for sound.\n');
+  }
+}
+
 // Run directly: node scripts/serve.mjs [distDir]
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const distDir = resolve(process.argv[2] ?? 'dist-offline');
   try {
     const { url } = await startServer({ distDir });
-    console.log('\n  AirBorneo Fresh Cargo Run is running offline.\n');
+    console.log('\n  AirBorneo · Connecting You is running offline.\n');
     console.log(`  Big screen:  ${url}`);
     console.log('  Phones:      scan the QR code on the big screen (same Wi-Fi)\n');
     console.log('  The certificate is self-signed: on each device choose Advanced → Proceed / Visit website.');
     console.log('  Press Ctrl+C to stop.\n');
-    if (process.platform === 'darwin' && !process.env.NO_OPEN) spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
+    if (process.platform === 'darwin' && !process.env.NO_OPEN) openBigScreen(url);
   } catch (err) {
     console.error(`\n  ${err.message}\n`);
     process.exit(1);

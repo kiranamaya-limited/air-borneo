@@ -36,6 +36,6 @@ export const flight = {
   to: { code: 'SIN', icao: 'WSSS', name: 'Singapore Changi', city: 'Singapore' },
   distanceNm: 381, // great-circle KCH-SIN
   blockTime: '1h 30m',
-  aircraft: 'ATR 72-500F',
-  cargo: 'Fresh Sarawak seafood & fruit',
+  aircraft: 'ATR 72-500',
+  passengers: 68,
 } as const;

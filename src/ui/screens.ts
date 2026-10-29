@@ -44,9 +44,9 @@ export class Screens {
     this.results.classList.add('hidden');
   }
 
-  showResults(sum: Summary, best: number, newBest: boolean, crashReason: string): void {
+  showResults(sum: Summary, best: number, newBest: boolean, crashReason: string, complaint: string | null): void {
     this.results.classList.remove('hidden');
-    $('res-eyebrow').textContent = sum.crashed ? 'Mission failed' : 'Arrived · Singapore Changi';
+    $('res-eyebrow').textContent = sum.crashed ? 'Flight not completed' : `Arrived · Singapore Changi · comfort ${sum.comfort}%`;
     $('res-stars').textContent = '★'.repeat(sum.stars) + '☆'.repeat(5 - sum.stars);
     $('res-rank').textContent = sum.crashed ? crashReason : sum.rank;
     $('res-score').textContent = `${sum.score.toLocaleString()} pts`;
@@ -67,9 +67,11 @@ export class Screens {
       table.appendChild(tr);
     }
     const note = sum.crashed
-      ? 'Keep the aircraft on the dotted line and above the terrain. Tilt gently: small inputs win.'
-      : `${sum.perfect} perfect, ${sum.good} good, ${sum.ok} ok, ${sum.miss} missed of ${sum.markers} markers · average ${sum.avgDeviation.toFixed(1)} m off the line · best combo ${sum.bestCombo}.` +
-        (sum.landing ? ` Touchdown at ${Math.round(sum.landing.fpm)} fpm (${sum.landing.grade}).` : '');
+      ? 'Keep the aircraft on the dotted line and above the terrain. Small, gentle inputs keep everyone safe and happy.'
+      : `${sum.happy} of ${sum.passengers} passengers had a lovely flight` +
+        (sum.sickBags ? ` · ${sum.sickBags} needed a sick bag 🤮` : ' · nobody needed a sick bag 🎉') +
+        (sum.landing ? `. Touchdown at ${Math.round(sum.landing.fpm)} fpm (${sum.landing.grade}).` : '.') +
+        (complaint ? ` Biggest complaint: ${complaint.toLowerCase()}.` : ' Not a single complaint!');
     $('res-note').textContent = note;
   }
 }

@@ -2,17 +2,7 @@
 
 export type FlapSetting = 0 | 15 | 30;
 
-export type Phase =
-  | 'pairing'
-  | 'intro'
-  | 'lineup'
-  | 'takeoff'
-  | 'flight'
-  | 'flare'
-  | 'rollout'
-  | 'taxiIn'
-  | 'results'
-  | 'crashed';
+export type Phase = 'pairing' | 'lineup' | 'takeoff' | 'flight' | 'flare' | 'rollout' | 'results' | 'crashed';
 
 /** Phone → screen. */
 export type ControllerMsg =
@@ -23,7 +13,7 @@ export type ControllerMsg =
 /** Screen → phone. */
 export type ScreenMsg =
   | { t: 'welcome'; code: string }
-  | { t: 'state'; phase: Phase; prompt: string; want: Want; flaps: FlapSetting; score: number }
+  | { t: 'state'; phase: Phase; prompt: string; want: Want; flaps: FlapSetting; score: number; comfort: number }
   | { t: 'haptic'; pattern: number | number[] }
   | { t: 'result'; score: number; stars: number; rank: string; best: number };
 

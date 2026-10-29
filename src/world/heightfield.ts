@@ -100,15 +100,24 @@ export class Heightfield {
     const f = dirFromHeading(200);
     this.sgCoast = { x: thr.x - f.x * 520, z: thr.z - f.z * 520, nx: f.x, nz: f.z };
 
-    const city = kchFrame.toWorld(-900, 4300);
+    // Kuching sits under the northbound "city" leg; the Sarawak River runs from upstream east of the
+    // city, through it, then west beneath the "river" leg to the sea.
+    const at = (s: number, rightOff: number) => {
+      const p = route.at(s);
+      const d = dirFromHeading(p.heading);
+      return { x: p.x - d.z * rightOff, z: p.z + d.x * rightOff };
+    };
+    const st = route.stations;
+    const city = at(st['city'] + 750, -250);
     this.kuchingCity = city;
-    // The Sarawak River: from upstream east of the city, through it, out to the coast.
+    const upstream = dirFromHeading(100);
     const riverPts = [
-      kchFrame.toWorld(-4200, 3600),
-      kchFrame.toWorld(-2200, 4500),
-      kchFrame.toWorld(-900, 4150),
-      kchFrame.toWorld(600, 4700),
-      kchFrame.toWorld(2600, 4300),
+      { x: city.x + upstream.x * 4200, z: city.z + upstream.z * 4200 },
+      { x: city.x + upstream.x * 1800, z: city.z + upstream.z * 1800 + 300 },
+      city,
+      at(st['river'] + 700, 380),
+      at(st['river'] + 1700, 480),
+      at(st['rainforest'] + 300, 520),
       { x: c1.x + right.x * 1700 + d1.x * 120, z: c1.z + right.z * 1700 + d1.z * 120 },
     ];
     for (let i = 0; i < riverPts.length - 1; i++) {
@@ -122,11 +131,11 @@ export class Heightfield {
     const rand = mulberry32(42);
     const s0 = route.stations['coast:end'] + 400;
     const s1 = route.stations['base'] + 300;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 16; i++) {
       const p = route.at(s0 + (s1 - s0) * rand());
       const d = dirFromHeading(p.heading);
       const side = rand() < 0.5 ? -1 : 1;
-      const off = side * (900 + rand() * 3500);
+      const off = side * (650 + rand() * 3200);
       this.islands.push({ x: p.x - d.z * off, z: p.z + d.x * off, r: 180 + rand() * 520 });
     }
   }

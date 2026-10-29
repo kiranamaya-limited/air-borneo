@@ -104,11 +104,14 @@ body.game {
 
 .hud-bottom {
   position: absolute; left: 18px; right: 18px; bottom: 18px;
-  display: grid; grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr) minmax(330px, 1fr); gap: 16px; align-items: end;
+  display: grid; grid-template-columns: minmax(300px, 1.3fr) minmax(280px, 1.6fr) minmax(330px, 1fr); gap: 16px; align-items: end;
 }
-.radio { padding: 12px 16px; min-height: 64px; }
-.radio p { margin: 6px 0 0; font-size: 13px; line-height: 1.35; color: var(--ab-ink); }
-.radio.flash { box-shadow: 0 0 0 3px var(--ab-yellow), var(--ab-shadow); }
+.radio {
+  position: absolute; top: 76px; left: 18px; width: min(340px, 30vw); padding: 10px 14px;
+  opacity: 0; transform: translateY(-6px); transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.radio.show { opacity: 1; transform: none; }
+.radio p { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: var(--ab-ink); }
 .progress { padding: 12px 18px 14px; }
 .progress-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--ab-slate); margin-bottom: 10px; }
 .progress-labels b { color: var(--ab-ink); }
@@ -168,20 +171,43 @@ body.game {
 .pause-card h2 { margin: 0; }
 .pause-card p { margin: 0; color: var(--ab-slate); }
 
-.sound-btn {
-  position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 20;
-  border: 0; border-radius: 999px; padding: 10px 14px; background: var(--ab-ink); color: var(--ab-white);
-  font: 600 13px/1 var(--ab-font); cursor: pointer;
+
+
+/* ------------------------------------------------------------------ cabin */
+.comfort-face { font-size: 22px; line-height: 1; }
+.score-value.warn { color: #c98a00; }
+.score-value.bad { color: var(--ab-red); }
+.cabin { position: relative; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+.cabin-head { display: flex; justify-content: space-between; align-items: center; }
+.cabin-happy { font-size: 12px; color: var(--ab-slate); }
+.cabin-seats { display: flex; justify-content: space-between; font-size: clamp(16px, 1.7vw, 26px); line-height: 1; }
+.cabin-seats span { display: inline-block; transition: transform 0.2s ease; }
+.cabin-seats span.react { animation: jolt 0.5s ease; }
+@keyframes jolt { 25% { transform: translateY(-6px) rotate(-8deg); } 60% { transform: translateY(2px) rotate(6deg); } }
+.cabin-bubble {
+  position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%) scale(0.9);
+  max-width: 90vw;
+  background: var(--ab-white); color: var(--ab-ink); border-radius: 14px; padding: 8px 14px;
+  font-weight: 800; font-size: 18px; white-space: nowrap; box-shadow: var(--ab-shadow);
+  opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none;
 }
+.cabin-bubble::after {
+  content: ''; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  border: 8px solid transparent; border-top-color: var(--ab-white);
+}
+.cabin-bubble.show { opacity: 1; transform: translateX(-50%) scale(1); }
+.cabin-bubble.bad { background: var(--ab-red); color: var(--ab-white); }
+.cabin-bubble.bad::after { border-top-color: var(--ab-red); }
+.cabin-story { font-size: 12px; color: var(--ab-slate); min-height: 1.2em; line-height: 1.35; }
 
 /* Cinematic phases: keep only the prompt and the brand. */
 .hud.cinematic .tape, .hud.cinematic .score-card, .hud.cinematic #heading-tape,
-.hud.cinematic .progress, .hud.cinematic .config { opacity: 0; }
+.hud.cinematic .progress, .hud.cinematic .config, .hud.cinematic .cabin { opacity: 0; }
 .hud .tape, .hud .score-card, .hud #heading-tape, .hud .progress, .hud .config { transition: opacity 0.6s ease; }
 
 @media (max-width: 1100px) {
   .flight-chip .mono { display: none; }
-  .hud-bottom { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 10px; }
+  .hud-bottom { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) auto; gap: 10px; }
   .radio p { font-size: 12px; }
   .progress-labels span:not(#hud-nm) { display: none; }
   .progress-labels { justify-content: center; }

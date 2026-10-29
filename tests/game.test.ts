@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Route, dirFromHeading, headingFromDir, lineupPoint, KCH } from '../src/game/route';
-import { Aircraft, G, TURN_GAIN, VR, ias, altitudeFt } from '../src/game/flight';
+import { Aircraft, G, ROLL_RATE, TURN_GAIN, VR, ias, altitudeFt } from '../src/game/flight';
+import { Comfort } from '../src/game/comfort';
 import { Scorer, gradeFor, landingGrade } from '../src/game/scoring';
 import { Mission } from '../src/game/mission';
 import { autopilot } from '../src/game/autopilot';
@@ -127,7 +128,7 @@ describe('scoring', () => {
     s.touchdown({ fpm: 180, centreline: 1, fromAim: 20 });
     const sum = s.summary();
     expect(sum.stars).toBe(5);
-    expect(sum.rank).toBe('Borneo Ace');
+    expect(sum.rank).toBe('Smooth Operator');
     expect(sum.landing?.grade).toBe('Butter');
 
     const bad = new Scorer(20);
@@ -137,54 +138,140 @@ describe('scoring', () => {
   });
 });
 
-describe('mission', () => {
-  it('can be flown end to end by the autopilot through the weather', () => {
-    const m = new Mission(1234);
-    m.start();
-    m.action(); // skip intro
-    expect(m.phase).toBe('lineup');
-    m.flapsPress(); // flaps 15
-    const dt = 1 / 60;
-    let t = 0;
-    let airborneAt = 0;
-    let touchdownAt = 0;
-    const phases = new Set<string>();
-    while (t < 240 && m.phase !== 'results' && m.phase !== 'crashed') {
-      const ap = autopilot(m.ac, m.route, m.track);
-      let throttle = 1;
-      if (m.phase === 'rollout') throttle = 0;
-      if (m.phase === 'flight' && m.ac.flaps !== 30 && m.want === 'flaps') m.flapsPress();
-      m.update(dt, { ...ap, throttle });
-      for (const e of m.drain()) {
-        if (e.type === 'liftoff') airborneAt = t;
-        if (e.type === 'touchdown') touchdownAt = t;
-      }
-      phases.add(m.phase);
-      t += dt;
+function fly(seed: number) {
+  const m = new Mission(seed);
+  m.start();
+  const dt = 1 / 60;
+  let t = 0;
+  let airborneAt = 0;
+  let touchdownAt = 0;
+  const phases = new Set<string>();
+  const reactions: string[] = [];
+  while (t < 300 && m.phase !== 'results' && m.phase !== 'crashed') {
+    const ap = autopilot(m.ac, m.route, m.track);
+    const throttle = m.phase === 'rollout' ? 0 : 1;
+    if (m.phase === 'flight' && m.ac.flaps !== 30 && m.want === 'flaps') m.flapsPress();
+    m.update(dt, { ...ap, throttle });
+    for (const e of m.drain()) {
+      if (e.type === 'liftoff') airborneAt = t;
+      if (e.type === 'touchdown') touchdownAt = t;
+      if (e.type === 'reaction') reactions.push(e.kind);
     }
-    expect(m.crashReason).toBe('');
-    expect(m.phase).toBe('results');
-    for (const p of ['takeoff', 'flight', 'flare', 'rollout', 'taxiIn']) expect(phases).toContain(p);
-    const airTime = touchdownAt - airborneAt;
-    // Enjoyable length: about a minute of steering.
-    expect(airTime).toBeGreaterThan(45);
-    expect(airTime).toBeLessThan(70);
-    const sum = m.summary!;
-    expect(sum.accuracy).toBeGreaterThan(0.5);
-    expect(sum.stars).toBeGreaterThanOrEqual(3);
-    console.log(
-      `air time ${airTime.toFixed(1)} s, markers ${sum.markers}, accuracy ${(sum.accuracy * 100).toFixed(0)}%, ` +
-        `avg dev ${sum.avgDeviation.toFixed(1)} m, landing ${sum.landing?.grade} ${sum.landing?.fpm.toFixed(0)} fpm, ` +
-        `fresh ${sum.freshness}%, score ${sum.score}, stars ${sum.stars}`,
-    );
+    phases.add(m.phase);
+    t += dt;
+  }
+  return { m, airTime: touchdownAt - airborneAt, phases, reactions };
+}
+
+describe('mission', () => {
+  it('starts straight on the runway, no cutscene', () => {
+    const m = new Mission(3);
+    m.start();
+    expect(m.phase).toBe('lineup');
   });
 
-  it('warns about config and will not roll with flaps up', () => {
+  for (const seed of [1234, 7, 99]) {
+    it(`can be flown smoothly end to end by the autopilot (seed ${seed})`, () => {
+      const { m, airTime, phases, reactions } = fly(seed);
+      expect(m.crashReason).toBe('');
+      expect(m.phase).toBe('results');
+      for (const p of ['takeoff', 'flight', 'flare', 'rollout']) expect(phases).toContain(p);
+      // About two minutes of flying.
+      expect(airTime).toBeGreaterThan(110);
+      expect(airTime).toBeLessThan(140);
+      const sum = m.summary!;
+      console.log(`seed ${seed}: comfort ${sum.comfort} lost ${JSON.stringify(Object.fromEntries(Object.entries(m.scorer.comfort.lostTo).map(([k, v]) => [k, Math.round(v)])))} reactions ${reactions.join(',')}`);
+      expect(sum.comfort).toBeGreaterThanOrEqual(85);
+      expect(sum.sickBags).toBe(0);
+      expect(sum.stars).toBeGreaterThanOrEqual(4);
+      console.log(
+        `seed ${seed}: air ${airTime.toFixed(1)} s, comfort ${sum.comfort}% (avg ${sum.avgComfort}%), happy ${sum.happy}/${sum.passengers}, ` +
+          `line ${(sum.accuracy * 100).toFixed(0)}%, landing ${sum.landing?.grade} ${sum.landing?.fpm.toFixed(0)} fpm, ` +
+          `score ${sum.score}, stars ${sum.stars}, lost ${JSON.stringify(Object.fromEntries(Object.entries(m.scorer.comfort.lostTo).map(([k, v]) => [k, Math.round(v)])))}, reactions ${reactions.join(',')}`,
+      );
+    });
+  }
+
+  it('a rough pilot makes the cabin gasp, scream and be sick', () => {
+    const m = new Mission(5);
+    m.start();
+    const kinds = new Set<string>();
+    for (let i = 0; i < 60 * 150 && m.phase !== 'results' && m.phase !== 'crashed'; i++) {
+      const ap = autopilot(m.ac, m.route, m.track);
+      const t = i / 60;
+      // Follow the route, but yank the yoke around every few seconds once airborne.
+      const yank = !m.ac.onGround && t > 25 ? (Math.floor(t / 2.5) % 2 ? 1 : -1) : 0;
+      const pitchYank = !m.ac.onGround && t > 25 ? Math.sin(t * 2.2) * 0.9 : 0;
+      const roll = Math.max(-1, Math.min(1, ap.roll + yank * 0.8));
+      m.update(1 / 60, { roll, pitch: pitchYank ? Math.sign(pitchYank) : ap.pitch, throttle: m.phase === 'rollout' ? 0 : 1 });
+      for (const e of m.drain()) if (e.type === 'reaction') kinds.add(e.kind);
+    }
+    expect(kinds).toContain('gasp');
+    expect(kinds.has('scream') || kinds.has('whoa')).toBe(true);
+    expect(kinds).toContain('vomit');
+    expect(m.comfort).toBeLessThan(50);
+  });
+
+  it('sets take-off flaps automatically if the throttle goes up first', () => {
     const m = new Mission(7);
     m.start();
-    m.action();
     m.update(0.1, { roll: 0, pitch: 0, throttle: 1 });
-    expect(m.phase).toBe('lineup');
+    expect(m.phase).toBe('takeoff');
+    expect(m.ac.flaps).toBe(15);
     expect(m.drain().some((e) => e.type === 'config')).toBe(true);
+  });
+});
+
+describe('passenger comfort', () => {
+  const calm = { bank: 0, pilotRollRate: 0, load: 1, turb: 0.05, offLine: 5, airborne: true };
+
+  it('drains with steep banks and makes people gasp', () => {
+    const c = new Comfort();
+    const reactions: string[] = [];
+    for (let i = 0; i < 60 * 5; i++) reactions.push(...c.update(1 / 60, { ...calm, bank: 40, pilotRollRate: 12 }));
+    expect(c.value).toBeLessThan(85);
+    expect(reactions).toContain('gasp');
+    expect(c.biggestComplaint()).toBe('bank');
+  });
+
+  it('screams on a sudden drop and someone is sick after sustained rough flying', () => {
+    const c = new Comfort();
+    const reactions: string[] = [];
+    for (let i = 0; i < 60 * 25; i++) reactions.push(...c.update(1 / 60, { ...calm, load: i % 120 < 60 ? 0.45 : 1.6, turb: 0.9 }));
+    expect(reactions).toContain('scream');
+    expect(reactions).toContain('vomit');
+    expect(c.sickBags).toBeGreaterThan(0);
+  });
+
+  it('recovers when the flight is smooth and on the line', () => {
+    const c = new Comfort();
+    c.jolt(20, null);
+    for (let i = 0; i < 60 * 20; i++) c.update(1 / 60, calm);
+    expect(c.value).toBeGreaterThan(85);
+  });
+
+  it('gets nervous when far off the dotted line', () => {
+    const c = new Comfort();
+    const reactions: string[] = [];
+    for (let i = 0; i < 60 * 10; i++) reactions.push(...c.update(1 / 60, { ...calm, offLine: 200 }));
+    expect(reactions).toContain('nervous');
+    expect(c.value).toBeLessThan(90);
+  });
+});
+
+describe('gentle controls', () => {
+  it('rolls no faster than an airliner, even with a full yank', () => {
+    const ac = new Aircraft();
+    ac.reset({ x: 0, y: 300, z: 0 }, 270);
+    ac.onGround = false;
+    ac.speed = 200;
+    const ctx = { targetSpeed: 200, trimGamma: 0, groundY: 0, landing: false };
+    let maxRate = 0;
+    for (let i = 0; i < 120; i++) {
+      const b0 = ac.bank;
+      ac.step(1 / 60, { roll: 1, pitch: 0, throttle: 0.8 }, CALM, ctx);
+      maxRate = Math.max(maxRate, Math.abs(ac.bank - b0) * 60);
+    }
+    expect(maxRate).toBeLessThanOrEqual(ROLL_RATE + 0.01);
   });
 });

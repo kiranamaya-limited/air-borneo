@@ -1,7 +1,6 @@
 /** Third-person chase camera plus the cinematic shots for the intro, taxi-in and results. */
 import * as THREE from 'three';
 import type { Mission } from '../game/mission';
-import { CHANGI_LAYOUT, KCH_LAYOUT, kchFrame } from '../game/layout';
 
 const DEG = Math.PI / 180;
 
@@ -43,40 +42,11 @@ export class CameraRig {
     let fov = 58;
 
     if (phase === 'pairing') {
-      // Slow orbit around the ATR on its stand, terminal behind.
+      // Slow orbit around the ATR waiting on runway 25.
       this.orbit += dt * 0.06;
       const a = this.orbit + 0.9;
       cam.position.set(p.x + Math.sin(a) * 62, p.y + 14 + Math.sin(this.orbit * 0.7) * 4, p.z + Math.cos(a) * 62);
       cam.lookAt(p.x, p.y + 1, p.z);
-    } else if (phase === 'intro') {
-      const fwd = headingDir(ac.heading);
-      const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
-      if (mission.shot === 0) {
-        // Establishing shot from the apron, high and wide, slowly pushing in.
-        const stand = kchFrame.toWorld(KCH_LAYOUT.stand.u + 120, KCH_LAYOUT.stand.v - 120);
-        const k = mission.shotTime / 3.6;
-        cam.position.set(stand.x, 34 - k * 10, stand.z);
-        cam.position.lerp(new THREE.Vector3(p.x, 20, p.z), k * 0.25);
-        cam.lookAt(p.x, p.y, p.z);
-        fov = 50;
-      } else if (mission.shot === 1) {
-        // Low tracking shot alongside the taxiing aircraft.
-        cam.position.copy(p).addScaledVector(right, -34).addScaledVector(fwd, 8 + mission.shotTime * 3);
-        cam.position.y = 3.5;
-        cam.lookAt(p.x, p.y + 0.5, p.z);
-        fov = 45;
-      } else {
-        // From the runway ahead as it turns onto 25.
-        const thr = kchFrame.toWorld(-KCH_LAYOUT.halfLength + 380, -26);
-        cam.position.set(thr.x, 4, thr.z);
-        cam.lookAt(p.x, p.y + 1, p.z);
-        fov = 38;
-      }
-    } else if (phase === 'taxiIn' && mission.shot === 1) {
-      const view = mission.changi.toWorld(CHANGI_LAYOUT.cargoStand.u + 120, CHANGI_LAYOUT.cargoStand.v - 70);
-      cam.position.set(view.x, 22, view.z);
-      cam.lookAt(p.x, p.y, p.z);
-      fov = 48;
     } else if (phase === 'results' || phase === 'crashed') {
       this.orbit += dt * 0.08;
       const a = this.orbit + ((-ac.heading - 120) * DEG);

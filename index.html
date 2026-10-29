@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="AirBorneo Fresh Cargo Run: fly an ATR 72 freighter from Kuching to Singapore with your phone as the yoke." />
-    <title>AirBorneo Fresh Cargo Run</title>
+    <meta name="description" content="AirBorneo · Connecting You: fly 68 passengers from Kuching to Singapore with your phone as the yoke, and keep them comfortable." />
+    <title>AirBorneo Connecting You</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body class="game">
@@ -28,20 +28,25 @@
         <canvas id="heading-tape" width="440" height="48"></canvas>
         <div class="score-card ab-card">
           <div class="score-row">
-            <span class="ab-eyebrow">Score</span>
-            <span class="mult" id="hud-mult">×1</span>
+            <span class="ab-eyebrow">Passenger comfort</span>
+            <span class="comfort-face" id="hud-face">😊</span>
           </div>
-          <div class="score-value mono" id="hud-score">0</div>
-          <div class="meter"><div class="meter-fill" id="hud-accuracy"></div></div>
+          <div class="score-value mono" id="hud-comfort">100%</div>
+          <div class="meter"><div class="meter-fill" id="hud-comfort-bar"></div></div>
           <div class="score-row small">
             <span>On the line</span>
             <span class="mono" id="hud-dev">–</span>
           </div>
           <div class="score-row small">
-            <span>Cargo fresh</span>
-            <span class="mono" id="hud-fresh">100%</span>
+            <span>Score <span class="mult" id="hud-mult">×1</span></span>
+            <span class="mono" id="hud-score">0</span>
           </div>
         </div>
+      </div>
+
+      <div class="radio ab-card" id="hud-radio">
+        <span class="ab-eyebrow">📻 Radio</span>
+        <p id="hud-atc"></p>
       </div>
 
       <canvas id="speed-tape" class="tape left" width="120" height="320"></canvas>
@@ -55,9 +60,15 @@
       <div id="popups" class="popups"></div>
 
       <div class="hud-bottom">
-        <div class="radio ab-card" id="hud-radio">
-          <span class="ab-eyebrow">ATC</span>
-          <p id="hud-atc">–</p>
+        <!-- The cabin: 68 passengers, a few of them shown, with their reactions. -->
+        <div class="cabin ab-card" id="cabin">
+          <div class="cabin-head">
+            <span class="ab-eyebrow">Cabin · 68 on board</span>
+            <span class="cabin-happy mono" id="cabin-happy">68 happy</span>
+          </div>
+          <div class="cabin-seats" id="cabin-seats"></div>
+          <div class="cabin-bubble" id="cabin-bubble"></div>
+          <div class="cabin-story" id="cabin-story"></div>
         </div>
         <div class="progress ab-card">
           <div class="progress-labels">
@@ -87,18 +98,18 @@
           <span class="ab-eyebrow">Borneo For You</span>
         </div>
         <span class="ab-stripe"></span>
-        <h1>Fresh Cargo Run</h1>
-        <p class="lead">Fly an AirBorneo ATR 72 freighter with fresh Sarawak seafood and fruit from Kuching to Singapore. Stay on the dotted line through crosswinds, a thunderstorm and a Sumatra squall, then land it smoothly.</p>
+        <h1>Connecting You</h1>
+        <p class="lead">68 passengers are flying home, to weddings, to meetings and on honeymoon. Fly AirBorneo flight 101 from Kuching to Singapore and <b>keep them comfortable</b>: gentle turns, steady through the storm, and a butter-smooth landing. Yank the yoke and you’ll hear about it…</p>
         <div class="brief">
           <div><span class="ab-eyebrow">Route</span><b class="mono">KCH → SIN</b></div>
           <div><span class="ab-eyebrow">Distance</span><b class="mono">381 NM</b></div>
-          <div><span class="ab-eyebrow">Aircraft</span><b class="mono">ATR 72-500F</b></div>
+          <div><span class="ab-eyebrow">Passengers</span><b class="mono">68 · ATR 72</b></div>
           <div><span class="ab-eyebrow">Runways</span><b class="mono">25 → 20C</b></div>
         </div>
         <ol class="how">
           <li><b>Scan</b> the code with your phone.</li>
           <li><b>Hold it like a yoke</b>: tilt to bank, tilt back to climb.</li>
-          <li><b>Flaps 15, throttle to TO, rotate</b>, then fly the dotted line.</li>
+          <li><b>Throttle to TO, rotate</b>, then fly the dotted line, gently.</li>
         </ol>
         <div class="best mono" id="title-best"></div>
       </div>
@@ -144,7 +155,6 @@
       </div>
     </section>
 
-    <button id="sound-btn" class="sound-btn hidden" type="button">🔈 Click for sound</button>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

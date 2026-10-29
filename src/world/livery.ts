@@ -122,17 +122,28 @@ export function paintFuselage(): THREE.CanvasTexture {
     ctx.restore();
 
     // Titles.
-    sideText(ctx, side, 'AirBorneo', 0.3, 0.68, 120, brand.fonts.ui, c.ink, 800);
-    sideText(ctx, side, brand.tagline.toUpperCase(), 0.3, 0.5, 40, brand.fonts.ui, c.red, 700);
-    sideText(ctx, side, 'FRESH CARGO · SARAWAK → SINGAPORE', 0.62, 0.62, 30, brand.fonts.ui, c.slate, 700);
+    sideText(ctx, side, 'AirBorneo', 0.3, 0.7, 120, brand.fonts.ui, c.ink, 800);
+    sideText(ctx, side, 'CONNECTING YOU', 0.62, 0.68, 34, brand.fonts.ui, c.red, 800);
+    sideText(ctx, side, brand.tagline.toUpperCase(), 0.3, 0.33, 34, brand.fonts.ui, c.slate, 700);
+
+    // Passenger windows along the cabin.
+    ctx.fillStyle = '#2a3340';
+    for (let u = 0.135; u < 0.72; u += 0.0215) {
+      if (u > 0.265 && u < 0.29) continue; // over the wing root emergency exit spacing
+      const y0 = sideY(side, 0.43);
+      const y1 = sideY(side, 0.53);
+      ctx.beginPath();
+      ctx.roundRect(u * W, Math.min(y0, y1), 17, Math.abs(y1 - y0), 6);
+      ctx.fill();
+    }
   }
 
-  // Forward cargo door outline (left side, as on ATR 72 freighters).
+  // Forward passenger door (left side) outline.
   ctx.strokeStyle = 'rgba(17,18,22,0.35)';
   ctx.lineWidth = 3;
   const d0 = sideY('left', 0.08);
-  const d1 = sideY('left', 0.62);
-  ctx.strokeRect(W * 0.12, Math.min(d0, d1), W * 0.07, Math.abs(d1 - d0));
+  const d1 = sideY('left', 0.6);
+  ctx.strokeRect(W * 0.105, Math.min(d0, d1), W * 0.032, Math.abs(d1 - d0));
   // Passenger door outline (rear left) and service door (rear right).
   ctx.strokeRect(W * 0.735, Math.min(sideY('left', 0.1), sideY('left', 0.6)), W * 0.028, Math.abs(sideY('left', 0.6) - sideY('left', 0.1)));
   ctx.strokeRect(W * 0.735, Math.min(sideY('right', 0.1), sideY('right', 0.6)), W * 0.028, Math.abs(sideY('right', 0.6) - sideY('right', 0.1)));

@@ -1,19 +1,25 @@
 /**
- * The mission: Kuching → Singapore with fresh cargo. A renderer-independent state machine that
- * owns the aircraft, weather, route tracking, markers, prompts and scoring. The 3D world, HUD,
- * audio and phone link all read from it.
+ * The mission: fly AB 101 and its 68 passengers from Kuching to Singapore, smoothly.
+ * A renderer-independent state machine that owns the aircraft, weather, route tracking, markers,
+ * passenger comfort, prompts and scoring. The 3D world, HUD, audio and phone link all read from it.
  */
 import { Aircraft, ias, type FlightContext, type FlightInput } from './flight';
-import { CHANGI_RWY, DEG, KCH, Route, headingFromDir, lineupPoint, type P3, type Track } from './route';
+import { CHANGI_RWY, DEG, KCH, Route, lineupPoint, type P3, type Track } from './route';
 import { WeatherSystem, type Alert, type Weather } from './hazards';
 import { Scorer, type Grade, type Summary } from './scoring';
-import { CHANGI_LAYOUT, changiFrame, kchFrame, kchTaxiPath, type Frame } from './layout';
+import { changiFrame, type Frame } from './layout';
+import type { Reaction } from './comfort';
+import { CABIN_STORIES, lineFor } from './stories';
 import type { FlapSetting, Phase, Want } from '../net/protocol';
 
 export type MissionEvent =
   | { type: 'phase'; phase: Phase }
   | { type: 'callout'; text: string; speak?: string }
   | { type: 'atc'; text: string }
+  | { type: 'pa'; text: string }
+  | { type: 'chime' }
+  | { type: 'story'; text: string }
+  | { type: 'reaction'; kind: Reaction; text: string }
   | { type: 'marker'; index: number; grade: Grade; points: number }
   | { type: 'liftoff' }
   | { type: 'tailstrike' }
@@ -36,65 +42,6 @@ export interface Marker {
 }
 
 export const MARKER_SPACING = 24;
-const INTRO_SHOTS = [
-  { dur: 3.6, p0: 0.0, p1: 0.07 },
-  { dur: 3.4, p0: 0.3, p1: 0.52 },
-  { dur: 3.2, p0: 0.8, p1: 1.0 },
-];
-const TAXI_IN_TIME = 8;
-
-interface PathSample {
-  x: number;
-  z: number;
-  heading: number;
-}
-
-/** Sample a smooth path through 2D points (Catmull-Rom), evenly spaced by arc length. */
-function smoothPath(pts: { x: number; z: number }[], spacing = 4): PathSample[] {
-  const dense: { x: number; z: number }[] = [];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(pts.length - 1, i + 2)];
-    for (let k = 0; k < 24; k++) {
-      const t = k / 24;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      const f = (a: number, b: number, c: number, d: number) =>
-        0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
-      dense.push({ x: f(p0.x, p1.x, p2.x, p3.x), z: f(p0.z, p1.z, p2.z, p3.z) });
-    }
-  }
-  dense.push(pts[pts.length - 1]);
-  const out: PathSample[] = [];
-  let carry = 0;
-  for (let i = 0; i < dense.length - 1; i++) {
-    const a = dense[i];
-    const b = dense[i + 1];
-    const len = Math.hypot(b.x - a.x, b.z - a.z);
-    const heading = headingFromDir(b.x - a.x, b.z - a.z);
-    let d = carry;
-    while (d < len) {
-      const t = d / len;
-      out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, heading });
-      d += spacing;
-    }
-    carry = d - len;
-  }
-  const last = dense[dense.length - 1];
-  out.push({ x: last.x, z: last.z, heading: out[out.length - 1]?.heading ?? 0 });
-  return out;
-}
-
-function samplePath(path: PathSample[], p: number): PathSample {
-  const f = Math.max(0, Math.min(1, p)) * (path.length - 1);
-  const i = Math.floor(f);
-  const j = Math.min(i + 1, path.length - 1);
-  const t = f - i;
-  const dh = ((path[j].heading - path[i].heading + 540) % 360) - 180;
-  return { x: path[i].x + (path[j].x - path[i].x) * t, z: path[i].z + (path[j].z - path[i].z) * t, heading: path[i].heading + dh * t };
-}
 
 const CALM: Weather = {
   wind: { x: 0, y: 0, z: 0 },
@@ -125,8 +72,6 @@ export class Mission {
   want: Want = 'none';
   alert: Alert | undefined;
   stage = 'GROUND';
-  shot = 0;
-  shotTime = 0;
   summary: Summary | null = null;
   crashReason = '';
   events: MissionEvent[] = [];
@@ -135,8 +80,6 @@ export class Mission {
 
   nextMarker = 0;
   private said = new Set<string>();
-  private introPath: PathSample[];
-  private taxiInPath: PathSample[] = [];
   private offCourseTime = 0;
   private throttleHighTime = 0;
   private lastAlertId = '';
@@ -153,22 +96,30 @@ export class Mission {
       this.markers.push({ s, x: p.x, y: p.y, z: p.z, grade: null });
     }
     this.scorer = new Scorer(this.markers.length);
-    this.introPath = smoothPath(kchTaxiPath().map((p) => kchFrame.toWorld(p.u, p.v)));
-    this.parkAtStand();
+    this.lineUp();
+  }
+
+  get comfort(): number {
+    return this.scorer.comfort.value;
   }
 
   // ------------------------------------------------------------------------------- controls
 
-  /** Start (from pairing) or restart (from results). */
+  /** Start (from pairing) or restart (from results): straight onto runway 25. */
   start(): void {
     this.reset();
-    this.setPhase('intro');
+    this.setPhase('lineup');
+    this.emit({ type: 'chime' });
+    this.say('atc-lineup', { type: 'atc', text: 'AirBorneo 101, wind 240 degrees 8 knots, runway 25, cleared for take-off.' });
+    this.say('pa-welcome', {
+      type: 'pa',
+      text: 'Ladies and gentlemen, welcome aboard AirBorneo flight 101 to Singapore. Sit back and enjoy a smooth flight.',
+    });
   }
 
   /** The phone's contextual action button / space bar. */
   action(): void {
-    if (this.phase === 'intro') this.enterLineup();
-    else if (this.phase === 'results' || this.phase === 'crashed' || this.phase === 'pairing') this.start();
+    if (this.phase === 'results' || this.phase === 'crashed' || this.phase === 'pairing') this.start();
   }
 
   flapsPress(): void {
@@ -190,10 +141,7 @@ export class Mission {
     this.phaseTime += dt;
     switch (this.phase) {
       case 'pairing':
-        this.ac.prop = 0.25;
-        break;
-      case 'intro':
-        this.updateIntro();
+        this.ac.prop = 0.3;
         break;
       case 'lineup':
         this.updateLineup(input);
@@ -208,9 +156,6 @@ export class Mission {
       case 'rollout':
         this.updateRollout(dt, input);
         break;
-      case 'taxiIn':
-        this.updateTaxiIn();
-        break;
       case 'results':
       case 'crashed':
         this.ac.prop = Math.max(0, this.ac.prop - dt * 0.3);
@@ -218,56 +163,25 @@ export class Mission {
     }
   }
 
-  private updateIntro(): void {
-    let t = this.phaseTime;
-    let shot = 0;
-    while (shot < INTRO_SHOTS.length - 1 && t > INTRO_SHOTS[shot].dur) {
-      t -= INTRO_SHOTS[shot].dur;
-      shot++;
-    }
-    const s = INTRO_SHOTS[shot];
-    if (shot !== this.shot) this.shot = shot;
-    this.shotTime = t;
-    const k = Math.min(1, t / s.dur);
-    const ease = k * k * (3 - 2 * k);
-    const p = samplePath(this.introPath, s.p0 + (s.p1 - s.p0) * (shot === 0 ? k * k : ease));
-    this.ac.pos = { x: p.x, y: 0, z: p.z };
-    this.ac.heading = p.heading;
-    this.ac.speed = 7;
-    this.ac.thrust = 0.15;
-    this.ac.prop = 0.45;
-    this.prompt = shot === 0 ? 'Kuching International · stand 4' : shot === 1 ? 'Taxi to runway 25' : 'Lining up runway 25';
-    this.want = 'action';
-    if (shot === 1 && !this.said.has('atc-taxi')) {
-      this.say('atc-taxi', { type: 'atc', text: 'AirBorneo 101, taxi to holding point runway 25 via Alpha.' });
-    }
-    if (this.phaseTime > INTRO_SHOTS.reduce((a, b) => a + b.dur, 0)) this.enterLineup();
-  }
-
-  private enterLineup(): void {
+  private lineUp(): void {
     const lu = lineupPoint();
     this.ac.reset(lu.pos, lu.heading);
     this.ac.prop = 0.4;
     this.track = this.route.track(this.ac.pos);
-    this.setPhase('lineup');
-    this.say('atc-lineup', { type: 'atc', text: 'AirBorneo 101, wind 240 degrees 8 knots, runway 25, cleared for take-off.' });
   }
 
   private updateLineup(input: FlightInput): void {
     this.stage = 'RWY 25';
-    if (this.ac.flaps !== 15) {
-      this.want = 'flaps';
-      this.prompt = this.ac.flaps === 0 ? 'Set FLAPS 15 for take-off' : 'Take-off flaps are 15°. Tap FLAPS';
-      if (input.throttle > 0.5 && !this.said.has('config')) {
-        this.said.add('config');
-        this.emit({ type: 'config' });
-        this.emit({ type: 'callout', text: 'CONFIG: FLAPS', speak: 'Config. Flaps.' });
-      }
-      return;
-    }
-    this.want = 'throttle-up';
-    this.prompt = 'Push the throttle to TO';
+    this.ac.prop = 0.4;
+    this.want = this.ac.flaps === 15 ? 'throttle-up' : 'flaps';
+    this.prompt = this.ac.flaps === 15 ? 'Push the throttle to TO' : 'Flaps 15, then throttle to TO';
     if (input.throttle > 0.85) {
+      // Forgot the flaps? The first officer sets them; a soft chime, no hold-up.
+      if (this.ac.flaps !== 15) {
+        this.setFlaps(15);
+        this.emit({ type: 'config' });
+        this.emit({ type: 'callout', text: 'Flaps 15 set', speak: 'Flaps fifteen' });
+      }
       this.setPhase('takeoff');
       this.emit({ type: 'callout', text: 'Power set', speak: 'Power set' });
     }
@@ -293,7 +207,7 @@ export class Mission {
     for (const e of events) {
       if (e === 'tailstrike') {
         this.scorer.bonus('Tail strike', `${ac.pitch.toFixed(1)}° pitch`, -400);
-        this.scorer.freshness -= 6;
+        this.reactAll(this.scorer.comfort.jolt(10, 'scream'));
         this.emit({ type: 'tailstrike' });
         this.emit({ type: 'callout', text: 'TAIL STRIKE', speak: 'Tail strike' });
         this.emit({ type: 'haptic', pattern: [80, 40, 80] });
@@ -311,10 +225,12 @@ export class Mission {
   private stageTargets(s: number): { speed: number; stage: string } {
     const st = this.route.stations;
     if (s < st['climb:end']) return { speed: 115, stage: 'CLIMB' };
-    if (s < st['turnout:end']) return { speed: 150, stage: 'CLIMB' };
+    if (s < st['city']) return { speed: 140, stage: 'CLIMB' };
+    if (s < st['river']) return { speed: 140, stage: 'OVER KUCHING' };
+    if (s < st['river:end']) return { speed: 150, stage: 'SARAWAK RIVER' };
     if (s < st['squall']) return { speed: 210, stage: 'CRUISE · FL170' };
-    if (s < st['base']) return { speed: 150, stage: 'DESCENT' };
-    if (s < st['final']) return { speed: 100, stage: 'APPROACH' };
+    if (s < st['base']) return { speed: 140, stage: 'DESCENT' };
+    if (s < st['final']) return { speed: 105, stage: 'APPROACH' };
     return { speed: 85, stage: 'FINAL · RWY 20C' };
   }
 
@@ -332,17 +248,30 @@ export class Mission {
     let trimGamma = Math.atan(ahead.slope) / DEG;
     // Initial climb: hold a positive climb away from the runway whatever the route says.
     if (this.track.s < st['climb:end'] && ac.pos.y < 40) trimGamma = Math.max(trimGamma, 5);
-    const ctx: FlightContext = {
-      targetSpeed: speed,
-      trimGamma,
-      groundY,
-      landing,
-      runway,
-    };
+    const ctx: FlightContext = { targetSpeed: speed, trimGamma, groundY, landing, runway };
     const events = ac.step(dt, input, this.wx, ctx);
     this.track = this.route.track(ac.pos, this.track.index);
-    this.scorer.handling(dt, this.wx.turb, ac.bank);
-    if (this.wx.lightning) this.emit({ type: 'lightning' });
+
+    // What the cabin feels.
+    const reactions = this.scorer.comfort.update(dt, {
+      bank: ac.bank,
+      pilotRollRate: ac.pilotRollRate,
+      load: ac.load,
+      turb: this.wx.turb,
+      offLine: this.track.dist,
+      airborne: !ac.onGround,
+    });
+    if (this.wx.lightning) {
+      this.emit({ type: 'lightning' });
+      this.scorer.comfort.flash(reactions);
+    }
+    this.reactAll(reactions);
+    if (this.comfort < 60) {
+      this.say('pa-bumps', {
+        type: 'pa',
+        text: 'Ladies and gentlemen, this is your captain. Sorry about the bumps. Please keep your seatbelts fastened.',
+      });
+    }
 
     // Markers crossed this frame.
     while (this.nextMarker < this.markers.length && this.markers[this.nextMarker].s <= this.track.s) {
@@ -358,7 +287,7 @@ export class Mission {
       this.nextMarker++;
     }
 
-    // Crew actions and callouts along the way.
+    // Crew actions, cabin chimes, stories and callouts along the way.
     if (this.gearUpAt > 0 && this.time >= this.gearUpAt) {
       this.gearUpAt = -1;
       ac.gearDown = false;
@@ -366,13 +295,30 @@ export class Mission {
       this.emit({ type: 'gear', down: false });
     }
     const s = this.track.s;
-    if (s > st['turnout'] && ac.flaps !== 0 && !this.said.has('flaps-up')) {
+    for (const story of CABIN_STORIES) {
+      if (s > st[story.at] + story.offset) this.say(`story-${story.at}`, { type: 'story', text: story.text });
+    }
+    if (s > st['city'] && ac.flaps !== 0 && !this.said.has('flaps-up')) {
       this.said.add('flaps-up');
       this.setFlaps(0);
       this.emit({ type: 'callout', text: 'Flaps up', speak: 'Flaps up' });
     }
-    if (s > st['rainforest']) this.say('atc-cruise', { type: 'atc', text: 'AirBorneo 101, Kuching Control, climb FL170, direct Singapore.' });
-    if (s > st['base']) this.say('atc-app', { type: 'atc', text: 'AirBorneo 101, Singapore Approach, cleared ILS runway 20C.' });
+    if (s > st['city'] + 200) this.say('atc-city', { type: 'atc', text: 'AirBorneo 101, Kuching Departure, right turn approved over the city, enjoy the view.' });
+    if (s > st['rainforest']) {
+      this.say('atc-cruise', { type: 'atc', text: 'AirBorneo 101, Kuching Control, climb FL170, direct Singapore.' });
+      if (!this.said.has('chime-cruise')) {
+        this.said.add('chime-cruise');
+        this.emit({ type: 'chime' });
+      }
+    }
+    if (s > st['base']) {
+      this.say('atc-app', { type: 'atc', text: 'AirBorneo 101, Singapore Approach, cleared ILS runway 20C.' });
+      this.say('pa-descent', { type: 'pa', text: 'Cabin crew, prepare for landing.' });
+      if (!this.said.has('chime-descent')) {
+        this.said.add('chime-descent');
+        this.emit({ type: 'chime' });
+      }
+    }
     if (s > st['base'] + 500 && !ac.gearDown) {
       ac.gearDown = true;
       this.emit({ type: 'callout', text: 'Gear down', speak: 'Gear down' });
@@ -397,18 +343,18 @@ export class Mission {
         [200, 'Minimums'],
         [100, 'One hundred'],
         [50, 'Fifty'],
-        [40, 'Forty'],
         [30, 'Thirty'],
-        [20, 'Twenty'],
         [10, 'Ten'],
       ] as const) {
         if (aglFt <= ft && aglFt > ft - 60) this.say(`ra${ft}`, { type: 'callout', text: text.toUpperCase(), speak: text });
       }
     }
 
-    // Prompts.
-    let prompt = 'Follow the dotted line';
+    // Prompts: comfort first.
+    let prompt = 'Fly the dotted line · keep it smooth';
     let want: Want = 'steer';
+    if (Math.abs(ac.bank) > 27) prompt = 'Gentle! Ease the bank for the passengers';
+    else if (this.wx.turb > 0.5) prompt = 'Rough air · small, smooth inputs';
     if (s > st['base'] && ac.flaps !== 30 && s < st['final'] + 700) {
       prompt = 'Approach: set FLAPS 30';
       want = 'flaps';
@@ -436,17 +382,18 @@ export class Mission {
       if (e === 'crash') return this.crash(groundY <= -0.5 ? 'Ditched in the sea' : 'Flew into terrain');
       if (e === 'touchdown') return this.onTouchdown();
     }
-    if (this.offCourseTime > 9) return this.crash('Strayed too far from the route');
+    if (this.offCourseTime > 12) return this.crash('Strayed too far from the route');
     if (this.track.s > st['final:end'] + 1000 && !ac.onGround) return this.crash('Floated past the runway');
   }
 
   private onTouchdown(): void {
     const ac = this.ac;
     const local = this.changi.toLocal(ac.pos.x, ac.pos.z);
-    const grade = this.scorer.touchdown({ fpm: ac.touchdownFpm, centreline: local.v, fromAim: local.u - 300 });
+    const { grade, reactions } = this.scorer.touchdown({ fpm: ac.touchdownFpm, centreline: local.v, fromAim: local.u - 300 });
     this.emit({ type: 'touchdown', fpm: ac.touchdownFpm, grade });
     this.emit({ type: 'haptic', pattern: grade === 'Hard' ? [120, 40, 120] : 60 });
     this.emit({ type: 'callout', text: `${grade.toUpperCase()} · ${Math.round(ac.touchdownFpm)} fpm`, speak: grade === 'Butter' ? 'Butter!' : grade });
+    this.reactAll(reactions);
     this.setAlert(undefined);
     this.setPhase('rollout');
   }
@@ -461,44 +408,16 @@ export class Mission {
     this.prompt = idle ? 'Braking · welcome to Singapore' : 'Throttle to IDLE';
     this.want = idle ? 'none' : 'throttle-idle';
     if (ac.speed < 18) {
-      this.say('atc-ground', { type: 'atc', text: 'AirBorneo 101, welcome to Singapore. Taxi to the Changi Airfreight Centre.' });
-      this.enterTaxiIn();
+      this.say('atc-ground', { type: 'atc', text: 'AirBorneo 101, welcome to Singapore. Thanks for flying them in safely.' });
+      this.say('pa-arrival', { type: 'pa', text: 'Ladies and gentlemen, welcome to Singapore. Thank you for flying AirBorneo.' });
+      this.emit({ type: 'chime' });
+      this.finish();
     }
   }
 
-  private enterTaxiIn(): void {
-    const L = CHANGI_LAYOUT;
-    const here = this.changi.toLocal(this.ac.pos.x, this.ac.pos.z);
-    const pts = [
-      { u: here.u, v: here.v },
-      { u: here.u + 90, v: 70 },
-      { u: here.u + 130, v: L.taxiwayV },
-      { u: L.cargoStand.u + (here.u + 130 > L.cargoStand.u ? 160 : -160), v: L.taxiwayV },
-      { u: L.cargoStand.u, v: L.cargoStand.v - 60 },
-      { u: L.cargoStand.u, v: L.cargoStand.v },
-    ];
-    this.taxiInPath = smoothPath(pts.map((p) => this.changi.toWorld(p.u, p.v)));
-    this.setPhase('taxiIn');
-  }
-
-  private updateTaxiIn(): void {
-    const k = Math.min(1, this.phaseTime / TAXI_IN_TIME);
-    const ease = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
-    const p = samplePath(this.taxiInPath, ease);
-    this.ac.pos = { x: p.x, y: 0, z: p.z };
-    this.ac.heading = p.heading;
-    this.ac.speed = k < 1 ? 8 : 0;
-    this.ac.thrust = k < 1 ? 0.12 : 0;
-    this.ac.pitch = 0;
-    this.ac.bank = 0;
-    this.shot = k < 0.5 ? 0 : 1;
-    this.prompt = 'Taxiing to the cargo stand';
-    this.want = 'none';
-    this.stage = 'TAXI';
-    if (k >= 1) this.finish();
-  }
-
   private finish(): void {
+    this.ac.speed = 0;
+    this.ac.thrust = 0;
     this.summary = this.scorer.summary();
     this.prompt = `${'★'.repeat(this.summary.stars)}${'☆'.repeat(5 - this.summary.stars)} ${this.summary.rank}`;
     this.want = 'action';
@@ -519,6 +438,13 @@ export class Mission {
 
   // ------------------------------------------------------------------------------- helpers
 
+  private reactAll(reactions: Reaction[]): void {
+    for (const kind of reactions) {
+      this.emit({ type: 'reaction', kind, text: lineFor(kind) });
+      if (kind === 'vomit' || kind === 'scream') this.emit({ type: 'haptic', pattern: [40, 30, 40] });
+    }
+  }
+
   private changiRunway(): { x: number; z: number; heading: number } {
     return { x: this.route.changiThreshold.x, z: this.route.changiThreshold.z, heading: CHANGI_RWY.heading };
   }
@@ -526,11 +452,6 @@ export class Mission {
   private onChangiRunwayArea(p: P3): boolean {
     const l = this.changi.toLocal(p.x, p.z);
     return l.u > -900 && l.u < CHANGI_RWY.length + 300 && Math.abs(l.v) < 150;
-  }
-
-  private parkAtStand(): void {
-    const p = samplePath(this.introPath, 0);
-    this.ac.reset({ x: p.x, y: 0, z: p.z }, p.heading);
   }
 
   private reset(): void {
@@ -548,15 +469,12 @@ export class Mission {
     this.crashReason = '';
     this.alert = undefined;
     this.lastAlertId = '';
-    this.shot = 0;
-    this.parkAtStand();
-    this.track = this.route.track(this.ac.pos);
+    this.lineUp();
   }
 
   private setPhase(phase: Phase): void {
     this.phase = phase;
     this.phaseTime = 0;
-    this.shot = 0;
     this.emit({ type: 'phase', phase });
   }
 
@@ -590,13 +508,9 @@ export class Mission {
   /** Distance flown as a fraction of the route, for the progress bar. */
   get progress(): number {
     const st = this.route.stations;
-    if (this.phase === 'results' || this.phase === 'taxiIn' || this.phase === 'rollout') return 1;
-    if (this.phase === 'pairing' || this.phase === 'intro' || this.phase === 'lineup') return 0;
+    if (this.phase === 'results' || this.phase === 'rollout') return 1;
+    if (this.phase === 'pairing' || this.phase === 'lineup') return 0;
     return Math.max(0, Math.min(1, (this.track.s - st['climb']) / (st['final:end'] - st['climb'])));
-  }
-
-  get isKch(): boolean {
-    return ['pairing', 'intro', 'lineup'].includes(this.phase);
   }
 
   /** Expose KCH constants for the world (keeps imports in one place). */

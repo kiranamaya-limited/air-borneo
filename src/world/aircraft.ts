@@ -1,7 +1,7 @@
 /**
  * Procedural ATR 72-500F at real dimensions: 27.17 m long, 27.05 m span, 7.65 m tall.
  * High straight wing with black de-icing boots, two PW127 nacelles with six-blade props,
- * T-tail with dorsal fillet, main gear retracting into fuselage sponsons, forward cargo door.
+ * T-tail with dorsal fillet, main gear retracting into fuselage sponsons, passenger windows.
  *
  * Local axes: nose towards -z, right wing +x, up +y. The fuselage axis is 2.45 m above the
  * main wheels' contact point.
