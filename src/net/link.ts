@@ -1,12 +1,43 @@
 import { Peer, type DataConnection, type PeerOptions } from 'peerjs';
 import { makeCode, peerIdFor, type ControllerMsg, type ScreenMsg } from './protocol';
+import { RelayControllerLink, RelayHostLink } from './relay';
 
 export type LinkStatus = 'starting' | 'ready' | 'connected' | 'reconnecting' | 'no-screen' | 'offline';
 
+export interface ScreenLink {
+  code: string;
+  status: LinkStatus;
+  readonly connected: boolean;
+  start(code: string): void;
+  send(msg: ScreenMsg): void;
+}
+
+export interface PhoneLink {
+  status: LinkStatus;
+  readonly connected: boolean;
+  connect(code: string): void;
+  close(): void;
+  send(msg: ControllerMsg): void;
+}
+
+/**
+ * The dev server and the offline demo run their own PeerJS signalling server, and a self-hosted
+ * one can be set with VITE_PEER_HOST. Online (Vercel) builds pair through public Nostr relays.
+ */
+const localBroker = import.meta.env.DEV || import.meta.env.VITE_PEER_LOCAL === '1' || !!import.meta.env.VITE_PEER_HOST;
+
+export function createScreenLink(onMessage: (msg: ControllerMsg) => void, onStatus: (status: LinkStatus, code: string) => void): ScreenLink {
+  return localBroker ? new HostLink(onMessage, onStatus) : new RelayHostLink(onMessage, onStatus);
+}
+
+export function createPhoneLink(onMessage: (msg: ScreenMsg) => void, onStatus: (status: LinkStatus) => void): PhoneLink {
+  return localBroker ? new ControllerLink(onMessage, onStatus) : new RelayControllerLink(onMessage, onStatus);
+}
+
 /**
  * Where the PeerJS signalling server lives. In dev, the Vite plugin in vite.config.ts serves one at
- * /peerjs on the same origin (as does the offline demo server); set VITE_PEER_HOST to use a self-hosted server in production.
- * Otherwise the free PeerJS cloud broker (with its STUN/TURN defaults) is used.
+ * /peerjs on the same origin (as does the offline demo server); VITE_PEER_HOST points at a
+ * self-hosted one.
  */
 function peerOptions(): PeerOptions {
   const env = import.meta.env;
@@ -20,20 +51,17 @@ function peerOptions(): PeerOptions {
     };
   }
   // Dev server and the offline demo build both run their own signalling server at /peerjs.
-  if (env.DEV || env.VITE_PEER_LOCAL === '1') {
-    return {
-      host: location.hostname,
-      port: Number(location.port || (location.protocol === 'https:' ? 443 : 80)),
-      path: '/peerjs',
-      secure: location.protocol === 'https:',
-      debug: 1,
-    };
-  }
-  return { debug: 1 };
+  return {
+    host: location.hostname,
+    port: Number(location.port || (location.protocol === 'https:' ? 443 : 80)),
+    path: '/peerjs',
+    secure: location.protocol === 'https:',
+    debug: 1,
+  };
 }
 
-/** The big screen: owns a short pairing code and accepts one phone at a time. */
-export class HostLink {
+/** The big screen over PeerJS: owns a short pairing code and accepts one phone at a time. */
+class HostLink implements ScreenLink {
   code = '';
   status: LinkStatus = 'starting';
   private conn?: DataConnection;
@@ -101,8 +129,8 @@ export class HostLink {
   }
 }
 
-/** The phone: connects to the screen that shows the given code, and keeps reconnecting. */
-export class ControllerLink {
+/** The phone over PeerJS: connects to the screen that shows the given code, and keeps reconnecting. */
+class ControllerLink implements PhoneLink {
   status: LinkStatus = 'starting';
   private peer?: Peer;
   private conn?: DataConnection;

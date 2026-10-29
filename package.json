@@ -20,7 +20,8 @@
     "peerjs": "^1.5.5",
     "qrcode": "^1.5.4",
     "selfsigned": "^5.5.0",
-    "three": "^0.186.1"
+    "three": "^0.186.1",
+    "trystero": "^0.26.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

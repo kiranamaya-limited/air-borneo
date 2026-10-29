@@ -8,7 +8,7 @@ import { World } from './world/world';
 import { Hud } from './ui/hud';
 import { Screens } from './ui/screens';
 import { GameAudio } from './audio/audio';
-import { HostLink, type LinkStatus } from './net/link';
+import { createScreenLink, type LinkStatus } from './net/link';
 import { makeCode, normaliseCode, type ControllerMsg, type Phase } from './net/protocol';
 
 const params = new URLSearchParams(location.search);
@@ -70,7 +70,7 @@ async function boot(): Promise<void> {
   const keys = new Set<string>();
   let startTimer = 0;
 
-  const link = new HostLink(onController, onLinkStatus);
+  const link = createScreenLink(onController, onLinkStatus);
   const code = normaliseCode(params.get('code') ?? '') || makeCode();
   const host = import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(location.hostname) ? __DEV_LAN_HOST__ : location.hostname;
   const port = location.port ? `:${location.port}` : '';
@@ -85,7 +85,7 @@ async function boot(): Promise<void> {
       connected: [phone.cal ? 'Phone ready' : 'Phone connected · calibrate on your phone', 'ok'],
       reconnecting: ['Reconnecting…', 'warn'],
       'no-screen': ['Pairing server unavailable', 'bad'],
-      offline: ['Offline · retrying', 'bad'],
+      offline: ['Can’t reach the pairing relays · check the internet connection', 'bad'],
     };
     screens.pairStatus(...text[status]);
   }

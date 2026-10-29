@@ -1,6 +1,6 @@
 import '../brand/brand.css';
 import './controller.css';
-import { ControllerLink, type LinkStatus } from '../net/link';
+import { createPhoneLink, type LinkStatus } from '../net/link';
 import { normaliseCode, type FlapSetting, type ScreenMsg, type Want } from '../net/protocol';
 import { calibrate, readTilt, shapeAxis, Smoother, upFromBetaGamma, upFromGravity, type Calibration, type Vec3 } from './tilt';
 
@@ -134,7 +134,7 @@ window.addEventListener('resize', updateRotateOverlay);
 
 // ---------------------------------------------------------------- link
 
-const link = new ControllerLink(onScreenMessage, onLinkStatus);
+const link = createPhoneLink(onScreenMessage, onLinkStatus);
 window.addEventListener('pagehide', () => link.close());
 let connectedOnce = false;
 
@@ -144,7 +144,7 @@ function onLinkStatus(status: LinkStatus): void {
     ready: ['Ready', 'warn'],
     connected: ['Connected', 'ok'],
     reconnecting: ['Reconnecting…', 'warn'],
-    'no-screen': ['No screen with that code', 'bad'],
+    'no-screen': ['Looking for the screen… check the code', 'warn'],
     offline: ['Offline, retrying…', 'bad'],
   };
   const [label, cls] = text[status];

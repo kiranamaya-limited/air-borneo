@@ -125,7 +125,7 @@ The first time, it asks a few questions: set up and deploy (yes), your personal 
 Open that production address on the big screen. Other deployment URLs sit behind Vercel's login protection, which phones can't pass.
 
 Online details:
-- **Pairing** uses the free PeerJS cloud broker (`0.peerjs.com`) and its STUN/TURN relays, so the phone can be on 4G while the big screen is on Wi-Fi. To run your own broker, set `VITE_PEER_HOST`, `VITE_PEER_PORT` and `VITE_PEER_PATH`, and deploy [peerjs-server](https://github.com/peers/peerjs-server).
+- **Pairing** goes through public Nostr relays (via [Trystero](https://github.com/dmotz/trystero)): the screen and the phone meet in a room named after the pairing code on 10 relays at once, so one being down or blocked doesn't matter, then talk directly over WebRTC. TURN relays carry the data when the phone (say on 4G) can't reach the screen directly. The offline demo keeps its own local PeerJS server. To test the online path without internet, `node scripts/test-relay.mjs` runs a local relay; build with `VITE_NOSTR_RELAYS=wss://<host>:7447`.
 - **Sound:** browsers hold back sound on an ordinary web page until its first click or key press, and a small "Sound off" hint shows until then. For sound from the first second, install the game: in Chrome, **⋮ → Cast, save and share → Install page as app** (or the install icon in the address bar). The installed app opens fullscreen with the lounge music on.
 
 ## How it's built
