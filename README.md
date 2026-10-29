@@ -2,7 +2,7 @@
 
 A three.js flying game for AirBorneo. **68 Sarawakians are flying home** from Kuala Lumpur: students back for the holidays, families going home for Gawai, a grandmother who has waited all year. Fly AirBorneo flight 101, an ATR 72-500, from **Kuala Lumpur International (WMKK)** home to **Kuching (WBGG)**, and **keep them comfortable**. Your phone is the control yoke and the game runs on a big screen (a laptop, TV or booth display), with lounge music playing throughout.
 
-- **It starts straight away**, lined up on KLIA's runway 32R. Push the throttle to TO (flaps 15 are set for you if you forget), then tilt back gently to rotate at 110 kt.
+- **It starts straight away**, lined up on KLIA's runway 32R. Push the throttle to TO (flaps 15 are set for you if you forget), then tip the top edge of the phone away from you to rotate at 110 kt (pitch starts inverted, like a flight sim; the phone's pitch button switches it for the session).
 - **Passenger comfort is the score.** The cabin panel shows the passengers' faces and you hear them react:
   - steep banks over 25° and jerky steering make them gasp ("My coffee!");
   - sudden, sustained drops and lurches make them scream;
@@ -33,7 +33,7 @@ A three.js flying game for AirBorneo. **68 Sarawakians are flying home** from Ku
 | Phone control | Does |
 | --- | --- |
 | Tilt left/right (steering wheel) | Bank, up to 35°. Keep it under 25° for the passengers |
-| Tilt top edge towards / away from you | Nose up / down |
+| Tip top edge away from / towards you | Nose up / down (inverted by default; switch on the phone) |
 | Throttle lever (left thumb) | IDLE · CLB · TO detents |
 | FLAPS (right thumb) | 0 → 15 → 30 |
 | Action | Start / fly again |

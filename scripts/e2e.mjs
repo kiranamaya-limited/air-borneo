@@ -119,9 +119,12 @@ try {
   await setTilt(phone, 0, 0);
 
   await screen.waitForFunction(() => window.__game.mission.ac.speed > 58, null, { timeout: 120000 });
-  await setTilt(phone, 0, 15);
+  // Pitch starts inverted: tilting the top edge away from you raises the nose.
+  await setTilt(phone, 0, -15);
+  await screen.waitForFunction(() => window.__game.input.pitch > 0.2, null, { timeout: 10000 });
+  check(true, 'pitch starts inverted: tilting forward is nose up');
   await screen.waitForFunction(() => window.__game.mission.phase === 'flight', null, { timeout: 60000 });
-  check(true, 'tilting back at Vr rotates and lifts off');
+  check(true, 'tilting forward at Vr rotates and lifts off');
   await setTilt(phone, 0, 0);
   await screen.screenshot({ path: `${SHOTS}/04-climb.png` });
 

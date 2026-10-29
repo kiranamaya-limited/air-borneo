@@ -205,7 +205,7 @@ export class Mission {
     if (kt >= 110) this.say('vr', { type: 'callout', text: 'ROTATE', speak: 'Rotate' });
     if (kt >= 110) {
       this.want = 'pitch-up';
-      this.prompt = 'ROTATE · tilt back gently';
+      this.prompt = 'ROTATE · nose up gently';
     } else {
       this.want = input.throttle < 0.85 ? 'throttle-up' : 'none';
       this.prompt = input.throttle < 0.85 ? 'Keep the throttle at TO' : 'Accelerating… wait for ROTATE';
@@ -381,7 +381,7 @@ export class Mission {
       want = 'flaps';
     } else if (s > st['final']) prompt = 'Follow the glide path · 3°';
     if (landing && agl < 12) {
-      prompt = 'FLARE · tilt back gently';
+      prompt = 'FLARE · nose up gently';
       want = 'pitch-up';
       if (this.phase !== 'flare') this.setPhase('flare');
     }

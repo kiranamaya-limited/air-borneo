@@ -47,7 +47,8 @@ const rollSmooth = new Smoother(0.35);
 const pitchSmooth = new Smoother(0.35);
 let roll = 0;
 let pitch = 0;
-let invertPitch = readPref('ab-invert-pitch') === '1';
+// Every session starts with inverted (flight-sim style) pitch; the toggle lasts for this session.
+let invertPitch = true;
 
 function screenAngle(): number {
   const a = screen.orientation?.angle ?? (window as unknown as { orientation?: number }).orientation ?? 0;
@@ -269,7 +270,6 @@ leverTrack.addEventListener('pointercancel', releaseLever);
 
 invertBtn.addEventListener('click', () => {
   invertPitch = !invertPitch;
-  writePref('ab-invert-pitch', invertPitch ? '1' : '0');
   invertBtn.textContent = invertPitch ? 'Pitch: inverted' : 'Pitch: normal';
 });
 invertBtn.textContent = invertPitch ? 'Pitch: inverted' : 'Pitch: normal';
@@ -394,20 +394,6 @@ function drawAttitude(): void {
 
 function round3(x: number): number {
   return Math.round(x * 1000) / 1000;
-}
-function readPref(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function writePref(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* storage unavailable */
-  }
 }
 
 const preset = new URLSearchParams(location.search).get('c');
