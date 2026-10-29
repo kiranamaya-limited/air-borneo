@@ -113,9 +113,16 @@ The app is unsigned, so the first time you open it:
 
 It is a static Vite site, and `vercel.json` sets the framework, the `dist` output and a `Permissions-Policy` header for the motion sensors. No environment variables are needed.
 
-1. In Vercel, **Add New → Project** and import `kiranamaya-limited/air-borneo`. If the organisation isn't listed, choose **Configure GitHub App** and give Vercel access to it.
-2. Make sure production builds the game's branch: **Settings → Git → Production Branch** (this branch, or `main` once it's merged).
-3. Open the production URL (`https://<project>.vercel.app`) on the big screen. Preview URLs sit behind Vercel Deployment Protection, which phones would have to log in to.
+Deploy from your computer with the Vercel CLI. It uploads this folder directly, so it works on a free Hobby account even though the repository belongs to a GitHub organisation:
+
+```bash
+npx vercel login
+npx vercel deploy --prod
+```
+
+The first time, it asks a few questions: set up and deploy (yes), your personal scope, no existing project, a project name such as `airborneo-coming-home`, and keep the detected settings. It prints the live address, `https://<project>.vercel.app`. Run `npx vercel deploy --prod` again to publish later changes.
+
+Open that production address on the big screen. Other deployment URLs sit behind Vercel's login protection, which phones can't pass.
 
 Online details:
 - **Pairing** uses the free PeerJS cloud broker (`0.peerjs.com`) and its STUN/TURN relays, so the phone can be on 4G while the big screen is on Wi-Fi. To run your own broker, set `VITE_PEER_HOST`, `VITE_PEER_PORT` and `VITE_PEER_PATH`, and deploy [peerjs-server](https://github.com/peers/peerjs-server).

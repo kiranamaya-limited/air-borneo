@@ -1,0 +1,8 @@
+# Upload only what Vercel needs to build the game.
+node_modules
+dist
+dist-offline
+desktop
+e2e-shots
+.preview
+*.log
