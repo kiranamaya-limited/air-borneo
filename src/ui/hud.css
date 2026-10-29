@@ -112,7 +112,7 @@ body.game {
 }
 .radio.show { opacity: 1; transform: none; }
 .radio p { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: var(--ab-ink); }
-.progress { padding: 12px 18px 14px; }
+.progress { padding: 12px 18px 26px; }
 .progress-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--ab-slate); margin-bottom: 10px; }
 .progress-labels b { color: var(--ab-ink); }
 .progress-track { position: relative; height: 6px; border-radius: 6px; background: var(--ab-mist); }
@@ -123,7 +123,7 @@ body.game {
 .progress-plane { position: absolute; top: 50%; left: 0%; width: 20px; height: 20px; transform: translate(-50%, -50%); color: var(--ab-ink); }
 .progress-plane svg { width: 100%; height: 100%; display: block; }
 .progress-track .hazard {
-  position: absolute; top: -20px; width: 14px; height: 14px; transform: translateX(-50%); color: var(--ab-slate);
+  position: absolute; top: 10px; width: 13px; height: 13px; transform: translateX(-50%); color: var(--ab-slate);
 }
 .progress-track .hazard svg { width: 100%; height: 100%; display: block; }
 .config {

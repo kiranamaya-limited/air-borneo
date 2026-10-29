@@ -104,9 +104,9 @@ export class Heightfield {
     const e = route.at(st['coast'] + 380);
     const de = dirFromHeading(e.heading);
     this.eastCoast = { x: e.x, z: e.z, nx: de.x, nz: de.z };
-    // Kuala Lumpur's towers stand off the left wing after the turn out of KLIA.
-    this.klCity = at(st['kl'] + 600, -1250);
-    this.titiwangsa = at(st['hills'] + 900, 400);
+    // Kuala Lumpur's skyline rises ahead and to the left as the turn out of KLIA ends.
+    this.klCity = at(st['kl'] + 1500, -850);
+    this.titiwangsa = at(st['hills'] + 800, 1300);
 
     // Borneo: the shore runs roughly east-west where the route crosses it, curving round so that
     // Kuching and its airport (south-west of the crossing) are well inland.
@@ -209,7 +209,7 @@ export class Heightfield {
       h = 0.6 + inland * (6 + hills) - Math.max(0, 1 - -penOut / 160) * 2.4;
       // The Titiwangsa range: forested ridges east of Kuala Lumpur.
       const td = Math.hypot(x - this.titiwangsa.x, z - this.titiwangsa.z);
-      h += 120 * Math.exp(-((td / 2200) ** 2)) * (0.75 + 0.25 * fbm(x / 400, z / 400)) * inland;
+      h += 260 * Math.exp(-((td / 1500) ** 2)) * (0.75 + 0.25 * fbm(x / 400, z / 400)) * inland;
     } else if (borIn > 0) {
       region = 'borneo';
       inland = smooth(0, 1400, borIn);
@@ -238,12 +238,16 @@ export class Heightfield {
       }
     }
 
+    // Keep Kuching's approach (and its light stanchions) low and flat.
+    const approach = Math.max(0, Math.min(1, (k.u + KCH_LAYOUT.halfLength + 2600) / 600, (-KCH_LAYOUT.halfLength + 400 - k.u) / 400, 1 - (Math.abs(k.v) - 250) / 250));
+    if (approach > 0 && region === 'borneo') h = h * (1 - approach) + Math.min(h, 1.2) * approach;
+
     // Flatten the airports exactly to y = 0.
     const flat = Math.max(kchAirport, kliaAirport);
     if (flat > 0) h = h * (1 - flat) - 1.4 * flat;
 
     let urban = 0;
-    if (region === 'borneo') urban = smooth(2600, 800, Math.hypot(x - this.kuchingCity.x, z - this.kuchingCity.z));
+    if (region === 'borneo') urban = smooth(1700, 600, Math.hypot(x - this.kuchingCity.x, z - this.kuchingCity.z));
     if (region === 'peninsula') urban = smooth(2800, 900, Math.hypot(x - this.klCity.x, z - this.klCity.z));
     if (urban > 0 && !river && flat === 0) h = Math.min(h, 2 + urban * 4 + (1 - urban) * h);
 

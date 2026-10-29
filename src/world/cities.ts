@@ -197,7 +197,7 @@ export function buildCities(field: Heightfield): THREE.Group {
 
   // Kuching: mostly low-rise with a handful of towers, around the river.
   const kc = field.kuchingCity;
-  group.add(towers(field, kc, 2600, 520, 8, 70, 11, ['#f2efe8', '#e8e2d6', '#f5f5f2', '#dcd6c9', '#e9eef2'], [14, 40]));
+  group.add(towers(field, kc, 1700, 380, 8, 70, 11, ['#f2efe8', '#e8e2d6', '#f5f5f2', '#dcd6c9', '#e9eef2'], [14, 40]));
   const dun = goldenRoof();
   dun.position.set(kc.x + 380, field.height(kc.x + 380, kc.z - 420) + 0.5, kc.z - 420);
   group.add(dun);
