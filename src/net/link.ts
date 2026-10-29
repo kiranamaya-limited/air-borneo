@@ -5,7 +5,7 @@ export type LinkStatus = 'starting' | 'ready' | 'connected' | 'reconnecting' | '
 
 /**
  * Where the PeerJS signalling server lives. In dev, the Vite plugin in vite.config.ts serves one at
- * /peerjs on the same origin; set VITE_PEER_HOST to use a self-hosted server in production.
+ * /peerjs on the same origin (as does the offline demo server); set VITE_PEER_HOST to use a self-hosted server in production.
  * Otherwise the free PeerJS cloud broker (with its STUN/TURN defaults) is used.
  */
 function peerOptions(): PeerOptions {
@@ -19,7 +19,8 @@ function peerOptions(): PeerOptions {
       debug: 1,
     };
   }
-  if (env.DEV) {
+  // Dev server and the offline demo build both run their own signalling server at /peerjs.
+  if (env.DEV || env.VITE_PEER_LOCAL === '1') {
     return {
       host: location.hostname,
       port: Number(location.port || (location.protocol === 'https:' ? 443 : 80)),

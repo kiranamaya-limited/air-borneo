@@ -71,7 +71,36 @@ Debug URL parameters for the big screen:
 - `?quality=low`: lower resolution, no shadows
 - `?autopilot`: demo mode
 
-## Deploy (Vercel)
+## Offline demo on your Mac (no internet, no Vercel)
+
+```bash
+npm install
+npm run demo
+```
+
+`npm run demo` builds the game and serves it over HTTPS on your Wi-Fi with its own pairing server, then opens the big screen in your browser.
+- Phones on the same Wi-Fi scan the QR code.
+- The certificate is self-signed, so tap **Advanced → Proceed** once on each device.
+- If macOS asks whether to accept incoming network connections, choose **Allow**.
+
+To change the port, set `PORT=9443 npm run demo`. The default is 8443.
+
+### As a Mac app (`.app` / `.dmg`)
+
+```bash
+cd desktop
+npm install
+npm run dist
+```
+
+`npm run dist` builds `desktop/dist/AirBorneo Fresh Cargo Run-<version>.dmg`. The app starts the same offline server inside itself and opens the game fullscreen. To try it without packaging, use `npm start` instead.
+
+The app is unsigned, so the first time you open it:
+1. Right-click the app → **Open** → **Open**.
+2. Allow incoming connections when macOS asks.
+3. Use the **Phone** menu to see the controller address.
+
+## Deploy (Vercel, optional)
 
 It is a static Vite site, and `vercel.json` sets the framework, the `dist` output and a `Permissions-Policy` header for the motion sensors.
 

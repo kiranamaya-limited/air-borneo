@@ -13,20 +13,21 @@ import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const PORT = 5180;
-const BASE = `https://localhost:${PORT}`;
+// E2E_URL=https://<lan-ip>:8443 tests an already-running offline demo server instead of the dev server.
+const BASE = process.env.E2E_URL ?? `https://localhost:${PORT}`;
 const SHOTS = 'e2e-shots';
 mkdirSync(SHOTS, { recursive: true });
 
-const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+const server = process.env.E2E_URL ? null : spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
 const stopServer = () => {
   try {
-    process.kill(-server.pid, 'SIGTERM');
+    if (server) process.kill(-server.pid, 'SIGTERM');
   } catch {
     /* already gone */
   }
 };
 process.on('exit', stopServer);
-await new Promise((resolve, reject) => {
+if (server) await new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error('vite did not start')), 60000);
   server.stdout.on('data', (d) => {
     if (String(d).includes('Local')) {
@@ -44,7 +45,7 @@ function check(cond, label) {
   if (!cond) failures.push(label);
 }
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--proxy-server=direct://'] });
 try {
   const screenCtx = await browser.newContext({ viewport: { width: 960, height: 540 }, ignoreHTTPSErrors: true });
   const screen = await screenCtx.newPage();
