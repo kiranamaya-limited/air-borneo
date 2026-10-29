@@ -45,7 +45,7 @@ export class World {
     this.ocean = new Ocean(this.env.sunDir);
     this.scene.add(this.ocean.mesh);
     this.scene.add(buildTerrain(this.field, mission.route));
-    this.airports = new Airports(mission.changi);
+    this.airports = new Airports(mission.route);
     this.scene.add(this.airports.group);
     this.scene.add(buildCities(this.field));
     this.scene.add(buildClouds(mission.route, mission.weather.stormCore));

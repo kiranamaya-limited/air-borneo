@@ -1,13 +1,13 @@
 /**
- * The mission: fly AB 101 and its 68 passengers from Kuching to Singapore, smoothly.
+ * The mission: fly AB 101 and its 68 passengers home from Kuala Lumpur to Kuching, smoothly.
  * A renderer-independent state machine that owns the aircraft, weather, route tracking, markers,
  * passenger comfort, prompts and scoring. The 3D world, HUD, audio and phone link all read from it.
  */
 import { Aircraft, ias, type FlightContext, type FlightInput } from './flight';
-import { CHANGI_RWY, DEG, KCH, Route, lineupPoint, type P3, type Track } from './route';
+import { DEG, KCH, KLIA, Route, designator, lineupPoint, type P3, type Track } from './route';
 import { WeatherSystem, type Alert, type Weather } from './hazards';
 import { Scorer, type Grade, type Summary } from './scoring';
-import { changiFrame, type Frame } from './layout';
+import { kchLandingFrame, type Frame } from './layout';
 import type { Reaction } from './comfort';
 import { CABIN_STORIES, lineFor } from './stories';
 import type { FlapSetting, Phase, Want } from '../net/protocol';
@@ -60,7 +60,8 @@ export class Mission {
   readonly route = new Route();
   readonly ac = new Aircraft();
   readonly markers: Marker[] = [];
-  readonly changi: Frame;
+  /** Kuching runway 25, origin at the threshold. */
+  readonly kch: Frame;
   weather: WeatherSystem;
   wx: Weather = CALM;
   scorer: Scorer;
@@ -84,12 +85,14 @@ export class Mission {
   private throttleHighTime = 0;
   private lastAlertId = '';
   private gearUpAt = -1;
+  /** The auto-trim's flight path, eased so route changes never jolt the cabin. */
+  private trim = 5;
   private seed: number;
 
   constructor(seed = (Math.random() * 2 ** 31) | 0) {
     this.seed = seed;
     this.weather = new WeatherSystem(this.route, seed);
-    this.changi = changiFrame(this.route);
+    this.kch = kchLandingFrame(this.route);
     const st = this.route.stations;
     for (let s = st['climb'] + 150; s < st['final:end'] - 40; s += MARKER_SPACING) {
       const p = this.route.at(s);
@@ -105,15 +108,18 @@ export class Mission {
 
   // ------------------------------------------------------------------------------- controls
 
-  /** Start (from pairing) or restart (from results): straight onto runway 25. */
+  /** KLIA's departure runway, e.g. "32R". */
+  static readonly depRunway = `${designator(KLIA.runwayHeading)}R`;
+
+  /** Start (from pairing) or restart (from results): straight onto KLIA's runway. */
   start(): void {
     this.reset();
     this.setPhase('lineup');
     this.emit({ type: 'chime' });
-    this.say('atc-lineup', { type: 'atc', text: 'AirBorneo 101, wind 240 degrees 8 knots, runway 25, cleared for take-off.' });
+    this.say('atc-lineup', { type: 'atc', text: `AirBorneo 101, wind 240 degrees 8 knots, runway ${Mission.depRunway}, cleared for take-off.` });
     this.say('pa-welcome', {
       type: 'pa',
-      text: 'Ladies and gentlemen, welcome aboard AirBorneo flight 101 to Singapore. Sit back and enjoy a smooth flight.',
+      text: 'Ladies and gentlemen, welcome aboard AirBorneo flight 101 to Kuching. Sit back, relax, we are taking you home.',
     });
   }
 
@@ -171,7 +177,7 @@ export class Mission {
   }
 
   private updateLineup(input: FlightInput): void {
-    this.stage = 'RWY 25';
+    this.stage = `RWY ${Mission.depRunway}`;
     this.ac.prop = 0.4;
     this.want = this.ac.flaps === 15 ? 'throttle-up' : 'flaps';
     this.prompt = this.ac.flaps === 15 ? 'Push the throttle to TO' : 'Flaps 15, then throttle to TO';
@@ -217,6 +223,7 @@ export class Mission {
         if (!ac.tailStruck) this.scorer.bonus('Rotation', late ? 'Late' : `Smooth · ${Math.round(kt)} kt`, late ? -150 : 300);
         this.emit({ type: 'liftoff' });
         this.gearUpAt = this.time + 1.6;
+        this.trim = 5;
         this.setPhase('flight');
       }
     }
@@ -225,13 +232,16 @@ export class Mission {
   private stageTargets(s: number): { speed: number; stage: string } {
     const st = this.route.stations;
     if (s < st['climb:end']) return { speed: 115, stage: 'CLIMB' };
-    if (s < st['city']) return { speed: 140, stage: 'CLIMB' };
-    if (s < st['river']) return { speed: 140, stage: 'OVER KUCHING' };
-    if (s < st['river:end']) return { speed: 150, stage: 'SARAWAK RIVER' };
+    if (s < st['kl']) return { speed: 140, stage: 'CLIMB' };
+    if (s < st['hills']) return { speed: 140, stage: 'KUALA LUMPUR' };
+    if (s < st['coast']) return { speed: 160, stage: 'TITIWANGSA' };
     if (s < st['squall']) return { speed: 210, stage: 'CRUISE · FL170' };
-    if (s < st['base']) return { speed: 140, stage: 'DESCENT' };
+    if (s < st['sarawak']) return { speed: 150, stage: 'DESCENT' };
+    if (s < st['river']) return { speed: 140, stage: 'SARAWAK COAST' };
+    if (s < st['kuching']) return { speed: 130, stage: 'SARAWAK RIVER' };
+    if (s < st['base']) return { speed: 120, stage: 'OVER KUCHING' };
     if (s < st['final']) return { speed: 105, stage: 'APPROACH' };
-    return { speed: 85, stage: 'FINAL · RWY 20C' };
+    return { speed: 85, stage: 'FINAL · RWY 25' };
   }
 
   private updateFlight(dt: number, input: FlightInput): void {
@@ -239,15 +249,19 @@ export class Mission {
     const st = this.route.stations;
     const prevS = this.track.s;
     const landing = this.track.s > st['final'] - 100;
-    const runway = landing ? this.changiRunway() : undefined;
-    const groundY = landing && this.onChangiRunwayArea(ac.pos) ? 0 : this.ground(ac.pos.x, ac.pos.z);
+    const runway = landing ? this.kchRunway() : undefined;
+    const groundY = landing && this.onKchRunwayArea(ac.pos) ? 0 : this.ground(ac.pos.x, ac.pos.z);
     this.wx = this.weather.sample(this.track.s, ac.pos, this.time);
     const { speed, stage } = this.stageTargets(this.track.s);
     this.stage = stage;
     const ahead = this.route.at(this.track.s + 40);
-    let trimGamma = Math.atan(ahead.slope) / DEG;
+    let trimTarget = Math.atan(ahead.slope) / DEG;
     // Initial climb: hold a positive climb away from the runway whatever the route says.
-    if (this.track.s < st['climb:end'] && ac.pos.y < 40) trimGamma = Math.max(trimGamma, 5);
+    if (this.track.s < st['climb:end'] && ac.pos.y < 40) trimTarget = Math.max(trimTarget, 5);
+    // On the glide path the trim follows exactly; elsewhere it eases at up to 1.5°/s.
+    const maxStep = (this.track.s > st['final'] - 100 ? 20 : 1.5) * dt;
+    this.trim += Math.max(-maxStep, Math.min(maxStep, trimTarget - this.trim));
+    const trimGamma = this.trim;
     const ctx: FlightContext = { targetSpeed: speed, trimGamma, groundY, landing, runway };
     const events = ac.step(dt, input, this.wx, ctx);
     this.track = this.route.track(ac.pos, this.track.index);
@@ -298,21 +312,28 @@ export class Mission {
     for (const story of CABIN_STORIES) {
       if (s > st[story.at] + story.offset) this.say(`story-${story.at}`, { type: 'story', text: story.text });
     }
-    if (s > st['city'] && ac.flaps !== 0 && !this.said.has('flaps-up')) {
+    if (s > st['kl'] && ac.flaps !== 0 && !this.said.has('flaps-up')) {
       this.said.add('flaps-up');
       this.setFlaps(0);
       this.emit({ type: 'callout', text: 'Flaps up', speak: 'Flaps up' });
     }
-    if (s > st['city'] + 200) this.say('atc-city', { type: 'atc', text: 'AirBorneo 101, Kuching Departure, right turn approved over the city, enjoy the view.' });
-    if (s > st['rainforest']) {
-      this.say('atc-cruise', { type: 'atc', text: 'AirBorneo 101, Kuching Control, climb FL170, direct Singapore.' });
+    if (s > st['kl'] + 200) this.say('atc-kl', { type: 'atc', text: 'AirBorneo 101, Lumpur Departure, Twin Towers off your left, climb on course.' });
+    if (s > st['coast']) {
+      this.say('atc-cruise', { type: 'atc', text: 'AirBorneo 101, Lumpur Control, climb FL170, direct Kuching.' });
       if (!this.said.has('chime-cruise')) {
         this.said.add('chime-cruise');
         this.emit({ type: 'chime' });
       }
     }
+    if (s > st['sarawak']) {
+      this.say('atc-kch', { type: 'atc', text: 'AirBorneo 101, Kuching Approach, descend 3000 feet, expect runway 25. Selamat pulang.' });
+      this.say('pa-home', {
+        type: 'pa',
+        text: 'Ladies and gentlemen, Mount Santubong is off the left side. Welcome back to Sarawak, we are nearly home.',
+      });
+    }
     if (s > st['base']) {
-      this.say('atc-app', { type: 'atc', text: 'AirBorneo 101, Singapore Approach, cleared ILS runway 20C.' });
+      this.say('atc-app', { type: 'atc', text: 'AirBorneo 101, Kuching Approach, cleared ILS runway 25.' });
       this.say('pa-descent', { type: 'pa', text: 'Cabin crew, prepare for landing.' });
       if (!this.said.has('chime-descent')) {
         this.said.add('chime-descent');
@@ -324,7 +345,7 @@ export class Mission {
       this.emit({ type: 'callout', text: 'Gear down', speak: 'Gear down' });
       this.emit({ type: 'gear', down: true });
     }
-    if (s > st['final']) this.say('atc-land', { type: 'atc', text: 'AirBorneo 101, wind 220 degrees 12 knots, runway 20C, cleared to land.' });
+    if (s > st['final']) this.say('atc-land', { type: 'atc', text: 'AirBorneo 101, wind 240 degrees 10 knots, runway 25, cleared to land.' });
     if (ac.flaps === 30 && s > st['base'] && !this.said.has('config-bonus')) {
       this.said.add('config-bonus');
       const onTime = s < st['final'] + 300;
@@ -388,7 +409,7 @@ export class Mission {
 
   private onTouchdown(): void {
     const ac = this.ac;
-    const local = this.changi.toLocal(ac.pos.x, ac.pos.z);
+    const local = this.kch.toLocal(ac.pos.x, ac.pos.z);
     const { grade, reactions } = this.scorer.touchdown({ fpm: ac.touchdownFpm, centreline: local.v, fromAim: local.u - 300 });
     this.emit({ type: 'touchdown', fpm: ac.touchdownFpm, grade });
     this.emit({ type: 'haptic', pattern: grade === 'Hard' ? [120, 40, 120] : 60 });
@@ -404,12 +425,12 @@ export class Mission {
     const idle = input.throttle < 0.2;
     this.throttleHighTime = idle ? 0 : this.throttleHighTime + dt;
     const throttle = idle || this.throttleHighTime > 3 ? 0 : input.throttle;
-    ac.step(dt, { roll: 0, pitch: 0, throttle }, CALM, { targetSpeed: 0, trimGamma: 0, groundY: 0, landing: true, runway: this.changiRunway() });
-    this.prompt = idle ? 'Braking · welcome to Singapore' : 'Throttle to IDLE';
+    ac.step(dt, { roll: 0, pitch: 0, throttle }, CALM, { targetSpeed: 0, trimGamma: 0, groundY: 0, landing: true, runway: this.kchRunway() });
+    this.prompt = idle ? 'Braking · welcome home to Kuching' : 'Throttle to IDLE';
     this.want = idle ? 'none' : 'throttle-idle';
     if (ac.speed < 18) {
-      this.say('atc-ground', { type: 'atc', text: 'AirBorneo 101, welcome to Singapore. Thanks for flying them in safely.' });
-      this.say('pa-arrival', { type: 'pa', text: 'Ladies and gentlemen, welcome to Singapore. Thank you for flying AirBorneo.' });
+      this.say('atc-ground', { type: 'atc', text: 'AirBorneo 101, welcome home. Thanks for bringing them back safely.' });
+      this.say('pa-arrival', { type: 'pa', text: 'Ladies and gentlemen, selamat datang ke Kuching. Welcome home, and thank you for flying AirBorneo.' });
       this.emit({ type: 'chime' });
       this.finish();
     }
@@ -445,13 +466,13 @@ export class Mission {
     }
   }
 
-  private changiRunway(): { x: number; z: number; heading: number } {
-    return { x: this.route.changiThreshold.x, z: this.route.changiThreshold.z, heading: CHANGI_RWY.heading };
+  private kchRunway(): { x: number; z: number; heading: number } {
+    return { x: this.route.kchThreshold.x, z: this.route.kchThreshold.z, heading: KCH.runwayHeading };
   }
 
-  private onChangiRunwayArea(p: P3): boolean {
-    const l = this.changi.toLocal(p.x, p.z);
-    return l.u > -900 && l.u < CHANGI_RWY.length + 300 && Math.abs(l.v) < 150;
+  private onKchRunwayArea(p: P3): boolean {
+    const l = this.kch.toLocal(p.x, p.z);
+    return l.u > -900 && l.u < KCH.runwayLength + 300 && Math.abs(l.v) < 150;
   }
 
   private reset(): void {
@@ -513,6 +534,4 @@ export class Mission {
     return Math.max(0, Math.min(1, (this.track.s - st['climb']) / (st['final:end'] - st['climb'])));
   }
 
-  /** Expose KCH constants for the world (keeps imports in one place). */
-  static readonly kch = KCH;
 }

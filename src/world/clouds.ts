@@ -1,4 +1,4 @@
-/** Low-poly cumulus over Borneo and the sea, and the towering cumulonimbus the route skirts. */
+/** Low-poly cumulus over the peninsula, the sea and Borneo, and the towering cumulonimbus the route skirts. */
 import * as THREE from 'three';
 import { mulberry32 } from '../game/hazards';
 import type { Route } from '../game/route';

@@ -53,7 +53,7 @@ export class LoungeMusic {
   constructor(private readonly ctx: AudioContext, destination: AudioNode, noise: AudioBuffer) {
     this.noise = noise;
     this.out = ctx.createGain();
-    this.out.gain.value = 0.22;
+    this.out.gain.value = 0.5;
     this.tone = ctx.createBiquadFilter();
     this.tone.type = 'lowpass';
     this.tone.frequency.value = 9000;

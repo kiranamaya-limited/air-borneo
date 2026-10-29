@@ -14,10 +14,10 @@ export const VR = 57; // m/s ≈ 110 kt
 export const VLOF = VR + 3;
 export const TURN_GAIN = 4; // compressed world: turns are 4x tighter than real for the same bank
 export const MAX_BANK = 35;
-/** Airliner-like roll: at most this many degrees per second, eased in and out. */
-export const ROLL_RATE = 12;
+/** Fastest roll the fly-by-wire law allows (deg/s). */
+export const ROLL_RATE = 45;
 /** Tilt changes the flight path by up to this many degrees either side of the trimmed path. */
-export const PITCH_AUTHORITY = 6;
+export const PITCH_AUTHORITY = 9;
 export const TAIL_STRIKE_PITCH = 9;
 /**
  * Flare model: below `zone` metres the power is at idle and the aircraft cannot climb. Pulling back
@@ -77,7 +77,6 @@ export class Aircraft {
   /** Smoothed commanded bank, before turbulence. */
   private bankCmd = 0;
   private rollRateCmd = 0;
-  private gammaRateCmd = 0;
   /** Rate of change of the actual bank angle (deg/s), turbulence included. */
   bankRate = 0;
 
@@ -94,7 +93,6 @@ export class Aircraft {
     this.heading = heading;
     this.bank = this.bankCmd = 0;
     this.rollRateCmd = 0;
-    this.gammaRateCmd = 0;
     this.bankRate = 0;
     this.pitch = this.gamma = this.lastGamma = 0;
     this.speed = this.vs = 0;
@@ -185,9 +183,10 @@ export class Aircraft {
   private stepAir(dt: number, input: FlightInput, atmo: Atmosphere, ctx: FlightContext, events: FlightEvent[]): void {
     // Roll: tilt sets the bank angle, like a fly-by-wire roll-attitude law. Turbulence adds on top.
     const target = input.roll * MAX_BANK;
-    const wantRate = Math.max(-ROLL_RATE, Math.min(ROLL_RATE, (target - this.bankCmd) * 1.3));
-    this.rollRateCmd += (wantRate - this.rollRateCmd) * Math.min(1, dt * 2.5);
-    this.bankCmd += this.rollRateCmd * dt;
+    const delta = target - this.bankCmd;
+    const step = Math.sign(delta) * Math.min(Math.abs(delta) * 3.5 * dt, ROLL_RATE * dt);
+    this.bankCmd += step;
+    this.rollRateCmd = step / Math.max(dt, 1e-3);
     const prevBank = this.bank;
     this.bank = Math.max(-60, Math.min(60, this.bankCmd + atmo.rollDisturb));
     this.bankRate = (this.bank - prevBank) / Math.max(dt, 1e-3);
@@ -197,9 +196,7 @@ export class Aircraft {
 
     // Pitch: auto-trim holds the route's climb/descent; tilt adds up to ±9°.
     const agl = this.pos.y - ctx.groundY;
-    // In the flare the elevator gets its full authority back, so a gentle pull arrests the sink.
-    const authority = ctx.landing && agl < FLARE.zone ? 9 : PITCH_AUTHORITY;
-    let gammaTarget = ctx.trimGamma + input.pitch * authority + atmo.pitchDisturb;
+    let gammaTarget = ctx.trimGamma + input.pitch * PITCH_AUTHORITY + atmo.pitchDisturb;
     if (ctx.landing && agl < FLARE.zone) {
       // Flare: idle power, ground effect. Pulling back cuts the sink rate but cannot stop it,
       // and the aircraft settles within a few seconds however long the flare is held.
@@ -210,18 +207,7 @@ export class Aircraft {
     this.stallWarning = gammaTarget > 12 && this.speed < 75;
     if (this.stallWarning) events.push('stall');
     gammaTarget = Math.max(-10, Math.min(14, gammaTarget));
-    if (this.flareTime > 0) {
-      this.gamma += (gammaTarget - this.gamma) * Math.min(1, dt * 3);
-      this.gammaRateCmd = 0;
-    } else {
-      // Pitch like an airliner: the flight path can only bend at up to ~0.45 g, eased in and out.
-      // Gentle inputs stay well inside what passengers notice; yanking the yoke does not.
-      // The auto-trim alone stays under 0.15 g; the pilot's tilt can add up to ~0.45 g in total.
-      const maxRate = ((0.15 + 0.3 * Math.min(1, Math.abs(input.pitch) * 1.5)) * G) / Math.max(this.speed, 40) / DEG;
-      const wantRate = Math.max(-maxRate, Math.min(maxRate, (gammaTarget - this.gamma) * 1.2));
-      this.gammaRateCmd += (wantRate - this.gammaRateCmd) * Math.min(1, dt * 3);
-      this.gamma += this.gammaRateCmd * dt;
-    }
+    this.gamma += (gammaTarget - this.gamma) * Math.min(1, dt * (this.flareTime > 0 ? 3 : 2.2));
 
     const aoa = 2 + 6 * Math.max(0, Math.min(1, (110 - this.speed) / 55)) + this.flapAngle * -0.05;
     this.pitch = this.gamma + aoa;

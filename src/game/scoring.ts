@@ -133,7 +133,7 @@ export class Scorer {
       { label: 'On the line', value: `${Math.round(accuracy * 100)}%`, points: this.score - this.bonuses.reduce((a, b) => a + b.points, 0) },
       ...this.bonuses,
     ];
-    if (c.sickBags > 0) lines.push({ label: 'Sick bags used', value: `${c.sickBags} 🤮`, points: -c.sickBags * 500 });
+    if (c.sickBags > 0) lines.push({ label: 'Sick bags used', value: `${c.sickBags}`, points: -c.sickBags * 500 });
     return {
       score: Math.max(0, this.score + comfortPoints - c.sickBags * 500),
       stars,

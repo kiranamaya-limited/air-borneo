@@ -35,9 +35,9 @@ export const COMFORT_LIMITS = {
   /** Banks beyond this start to worry people. */
   bank: 25,
   /** Commanded roll rates beyond this feel like a lurch. */
-  rollRate: 8,
-  loadLow: 0.74,
-  loadHigh: 1.3,
+  rollRate: 20,
+  loadLow: 0.6,
+  loadHigh: 1.45,
   /** Turbulence above this is felt as shaking. */
   turb: 0.5,
   /** Metres off the dotted line before the cabin gets nervous. */
@@ -79,8 +79,8 @@ export class Comfort {
     const out: Reaction[] = [];
     if (!f.airborne) return out;
     const L = COMFORT_LIMITS;
-    // Smooth the load factor a little: people feel sustained g, not single-frame spikes.
-    this.load += (f.load - this.load) * Math.min(1, dt * 4);
+    // People feel sustained g, not single-frame spikes.
+    this.load += (f.load - this.load) * Math.min(1, dt * 1.5);
 
     const bankExcess = Math.max(0, Math.abs(f.bank) - L.bank);
     const rollExcess = Math.max(0, Math.abs(f.pilotRollRate) - L.rollRate);
@@ -91,7 +91,7 @@ export class Comfort {
     const parts: Record<Exclude<Complaint, 'jolt'>, number> = {
       bank: bankExcess * 0.28, // 35° bank ≈ 2.8 %/s
       roll: rollExcess * 0.25, // yanking at 12°/s ≈ 1 %/s
-      g: gExcess * 18, // 0.5 g drop ≈ 4.5 %/s
+      g: gExcess * 12, // a sustained 0.4 g drop ≈ 2.4 %/s
       shake: shake * 4.5, // edge of the storm ≈ 0.7 %/s, its core ≈ 2.2 %/s
       lost: Math.min(2, lost / 70), // well off course ≈ up to 2 %/s
     };
@@ -112,8 +112,8 @@ export class Comfort {
     this.time += dt;
 
     // Reactions, most dramatic first.
-    if (this.load < 0.62) this.react('scream', out);
-    else if (this.load > 1.42) this.react('whoa', out);
+    if (this.load < 0.5) this.react('scream', out);
+    else if (this.load > 1.6) this.react('whoa', out);
     if (bankExcess > 6 || rollExcess > 2.5) this.react('gasp', out);
     if (shake > 0.18 && Math.random() < dt * 0.8) this.react('gasp', out);
     if (lost > 80) this.react('nervous', out);

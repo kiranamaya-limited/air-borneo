@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Route, dirFromHeading, headingFromDir, lineupPoint, KCH } from '../src/game/route';
+import { Route, designator, dirFromHeading, headingFromDir, lineupPoint, KCH, KLIA } from '../src/game/route';
 import { Aircraft, G, ROLL_RATE, TURN_GAIN, VR, ias, altitudeFt } from '../src/game/flight';
 import { Comfort } from '../src/game/comfort';
 import { Scorer, gradeFor, landingGrade } from '../src/game/scoring';
@@ -11,12 +11,13 @@ const CALM = { wind: { x: 0, y: 0, z: 0 }, rollDisturb: 0, pitchDisturb: 0 };
 describe('route', () => {
   const route = new Route();
 
-  it('starts on runway 25 at Kuching and ends on Changi 20C', () => {
+  it('starts on KLIA runway 32R and ends on Kuching runway 25', () => {
     const start = route.at(0);
-    expect(start.heading).toBeCloseTo(KCH.runwayHeading, 5);
+    expect(start.heading).toBeCloseTo(KLIA.runwayHeading, 5);
+    expect(designator(KLIA.runwayHeading)).toBe('32');
     expect(start.y).toBe(0);
     const final = route.at(route.stations['final'] + 10);
-    expect(final.heading).toBeCloseTo(200, 3);
+    expect(final.heading).toBeCloseTo(KCH.runwayHeading, 3);
     // 3° glide path on final
     expect(Math.atan(-final.slope) / (Math.PI / 180)).toBeCloseTo(3, 0);
     expect(route.at(route.stations['final:end']).y).toBeCloseTo(0, 5);
@@ -50,9 +51,10 @@ describe('route', () => {
     }
   });
 
-  it('places the line-up point on the runway 25 end', () => {
+  it('places the line-up point just past the KLIA runway 32R threshold', () => {
     const lu = lineupPoint();
-    expect(Math.hypot(lu.pos.x, lu.pos.z)).toBeCloseTo(KCH.runwayLength / 2 - 80, 0);
+    expect(Math.hypot(lu.pos.x - KLIA.threshold.x, lu.pos.z - KLIA.threshold.z)).toBeCloseTo(80, 0);
+    expect(lu.heading).toBe(KLIA.runwayHeading);
   });
 });
 
@@ -228,7 +230,7 @@ describe('passenger comfort', () => {
   it('drains with steep banks and makes people gasp', () => {
     const c = new Comfort();
     const reactions: string[] = [];
-    for (let i = 0; i < 60 * 5; i++) reactions.push(...c.update(1 / 60, { ...calm, bank: 40, pilotRollRate: 12 }));
+    for (let i = 0; i < 60 * 5; i++) reactions.push(...c.update(1 / 60, { ...calm, bank: 40, pilotRollRate: 30 }));
     expect(c.value).toBeLessThan(85);
     expect(reactions).toContain('gasp');
     expect(c.biggestComplaint()).toBe('bank');
@@ -237,7 +239,7 @@ describe('passenger comfort', () => {
   it('screams on a sudden drop and someone is sick after sustained rough flying', () => {
     const c = new Comfort();
     const reactions: string[] = [];
-    for (let i = 0; i < 60 * 25; i++) reactions.push(...c.update(1 / 60, { ...calm, load: i % 120 < 60 ? 0.45 : 1.6, turb: 0.9 }));
+    for (let i = 0; i < 60 * 25; i++) reactions.push(...c.update(1 / 60, { ...calm, load: i % 180 < 90 ? 0.3 : 1.8, turb: 0.9 }));
     expect(reactions).toContain('scream');
     expect(reactions).toContain('vomit');
     expect(c.sickBags).toBeGreaterThan(0);
@@ -259,8 +261,8 @@ describe('passenger comfort', () => {
   });
 });
 
-describe('gentle controls', () => {
-  it('rolls no faster than an airliner, even with a full yank', () => {
+describe('controls', () => {
+  it('caps the roll rate, even with a full yank', () => {
     const ac = new Aircraft();
     ac.reset({ x: 0, y: 300, z: 0 }, 270);
     ac.onGround = false;

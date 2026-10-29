@@ -1,9 +1,9 @@
 /**
  * Weather along the route. Each hazard is real for the region:
- *  - gusty crosswind on the climb out of Kuching,
+ *  - gusty crosswind on the climb out of KLIA,
  *  - convective up/downdrafts over the afternoon rainforest,
  *  - a cumulonimbus cell over the South China Sea (the route bends round its core),
- *  - a "Sumatra" squall line near Singapore,
+ *  - a squall line off the Sarawak coast,
  *  - a microburst windshear on short final.
  */
 import { dirFromHeading, type P3, type Route } from './route';
@@ -101,7 +101,7 @@ export class WeatherSystem {
     let lightning = false;
     let alert: Alert | undefined;
 
-    // Base wind: 240° at 8 kt, a typical Kuching afternoon headwind for runway 25.
+    // Base wind: 240° at 8 kt, a typical afternoon south-westerly (a headwind for Kuching's runway 25).
     let windFrom = 240;
     let windKt = 8;
     let gustKt = 0;
@@ -109,8 +109,8 @@ export class WeatherSystem {
     wx += base.x * 4;
     wz += base.z * 4;
 
-    // 1. Gusty crosswind on the climb-out over Kuching.
-    const xw = ramp(s, st['turnout'] + 600, st['city:end'] + 200, 300);
+    // 1. Gusty crosswind on the climb-out from KLIA, past Kuala Lumpur.
+    const xw = ramp(s, st['turnout'] + 600, st['kl:end'] + 200, 300);
     if (xw > 0) {
       const gust = Math.max(0, this.gustNoise.at(t)) * 6;
       const to = dirFromHeading(130);
@@ -124,15 +124,15 @@ export class WeatherSystem {
       if (xw > 0.3) alert = { id: 'xwind', text: `CROSSWIND  310° / ${windKt} KT  G${gustKt}`, level: 'caution' };
     }
 
-    // 2. Convective up/downdrafts over the river and rainforest.
-    const th = ramp(s, st['river'] + 900, st['coast'] + 100, 250);
+    // 2. Convective up/downdrafts over the Titiwangsa hills.
+    const th = ramp(s, st['hills'] + 300, st['coast'] + 100, 250);
     if (th > 0) {
       wy += Math.sin(s / 260 + this.thermalPhase) * 3.2 * th;
       turb = Math.max(turb, 0.36 * th);
       if (!alert) alert = { id: 'thermals', text: 'CONVECTIVE UP & DOWNDRAFTS', level: 'caution' };
     }
 
-    // 2b. Sea-breeze gusts along the Santubong coast, from the north-west.
+    // 2b. Sea-breeze gusts off the east coast, from the north-west.
     const sb = ramp(s, st['coast'] + 200, st['islands'] + 400, 250);
     if (sb > 0) {
       const gust = Math.max(0, this.gustNoise.at(t * 1.6)) * 7;
@@ -166,8 +166,8 @@ export class WeatherSystem {
       if (!alert || near > 0.3) alert = { id: 'storm', text: 'CB CELL: SEVERE TURBULENCE, STAY ON TRACK', level: near > 0.55 ? 'warning' : 'caution' };
     }
 
-    // 4. Sumatra squall: strong south-westerly with heavy rain.
-    const sq = ramp(s, st['squall'] - 100, st['base'] + 500, 220);
+    // 4. Squall line off Borneo: strong south-westerly with heavy rain, clearing at the coast.
+    const sq = ramp(s, st['squall'] - 100, st['sarawak'] + 350, 220);
     if (sq > 0) {
       const gust = Math.max(0, this.gustNoise.at(t * 1.3)) * 7;
       const to = dirFromHeading(40);
@@ -179,7 +179,7 @@ export class WeatherSystem {
       windFrom = 220;
       windKt = Math.round(26 * sq + 8 * (1 - sq));
       gustKt = Math.round((26 + gust * KT) * sq);
-      if (sq > 0.3) alert = { id: 'squall', text: `SUMATRA SQUALL  220° / ${windKt} KT  G${gustKt}`, level: 'caution' };
+      if (sq > 0.3) alert = { id: 'squall', text: `SQUALL LINE  220° / ${windKt} KT  G${gustKt}`, level: 'caution' };
     }
 
     // 5. Microburst on short final: brief updraft, then a strong sink.

@@ -43,9 +43,8 @@ function show(next: Step): void {
 let latestUp: Vec3 | null = null;
 let sensorSource: 'orientation' | 'motion' | null = null;
 let cal: Calibration | null = null;
-// Heavier smoothing, a wider deadzone and more expo: the yoke should feel calm, not twitchy.
-const rollSmooth = new Smoother(0.18);
-const pitchSmooth = new Smoother(0.18);
+const rollSmooth = new Smoother(0.35);
+const pitchSmooth = new Smoother(0.35);
 let roll = 0;
 let pitch = 0;
 let invertPitch = readPref('ab-invert-pitch') === '1';
@@ -79,8 +78,8 @@ function sensorUpdated(): void {
   }
   if (!cal || !latestUp) return;
   const t = readTilt(cal, latestUp);
-  roll = shapeAxis(rollSmooth.next(t.roll), 3, 40, 0.55);
-  pitch = shapeAxis(pitchSmooth.next(t.pitch), 3, 30, 0.55) * (invertPitch ? -1 : 1);
+  roll = shapeAxis(rollSmooth.next(t.roll), 2, 35);
+  pitch = shapeAxis(pitchSmooth.next(t.pitch), 2, 25) * (invertPitch ? -1 : 1);
 }
 
 async function requestSensors(): Promise<boolean> {
@@ -176,7 +175,7 @@ function onScreenMessage(msg: ScreenMsg): void {
     case 'state': {
       promptEl.textContent = msg.prompt;
       promptEl.classList.toggle('urgent', msg.want === 'pitch-up' || msg.want === 'throttle-idle');
-      scoreEl.textContent = msg.phase === 'pairing' || msg.phase === 'lineup' ? '' : `${comfortFace(msg.comfort)} Passengers ${Math.round(msg.comfort)}%`;
+      scoreEl.textContent = msg.phase === 'pairing' || msg.phase === 'lineup' ? '' : `Passengers ${Math.round(msg.comfort)}%`;
       setWant(msg.want);
       if (msg.flaps !== flaps) setFlaps(msg.flaps, false);
       actionValue.textContent = actionLabel(msg.phase);
@@ -192,9 +191,6 @@ function onScreenMessage(msg: ScreenMsg): void {
   }
 }
 
-function comfortFace(c: number): string {
-  return c > 90 ? '😊' : c > 78 ? '🙂' : c > 62 ? '😐' : c > 45 ? '😟' : c > 30 ? '😣' : '🤢';
-}
 
 function actionLabel(phase: string): string {
   if (phase === 'results' || phase === 'crashed') return 'Fly again';
@@ -342,7 +338,7 @@ function drawAttitude(): void {
   ctx.arc(r, r, r - 2, 0, Math.PI * 2);
   ctx.clip();
   ctx.translate(r, r);
-  ctx.rotate(-roll * (40 * Math.PI) / 180);
+  ctx.rotate(-roll * (35 * Math.PI) / 180);
   const offset = pitch * r * 0.6;
   ctx.fillStyle = '#d9ecf7';
   ctx.fillRect(-s, -s * 2 + offset, s * 2, s * 2);

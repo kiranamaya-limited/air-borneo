@@ -119,7 +119,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const distDir = resolve(process.argv[2] ?? 'dist-offline');
   try {
     const { url } = await startServer({ distDir });
-    console.log('\n  AirBorneo · Connecting You is running offline.\n');
+    console.log('\n  AirBorneo · Coming Home is running offline.\n');
     console.log(`  Big screen:  ${url}`);
     console.log('  Phones:      scan the QR code on the big screen (same Wi-Fi)\n');
     console.log('  The certificate is self-signed: on each device choose Advanced → Proceed / Visit website.');

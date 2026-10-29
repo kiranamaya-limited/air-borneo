@@ -1,5 +1,5 @@
 /**
- * The flight route: a compressed Kuching → Singapore track, built "turtle" style from straight and
+ * The flight route: a compressed Kuala Lumpur → Kuching track, built "turtle" style from straight and
  * curved legs, then sampled every few metres for fast nearest-point lookups.
  *
  * World axes: x = east, y = up, z = south (metres). Headings are degrees true, clockwise from north.
@@ -51,50 +51,65 @@ const smooth = (t: number) => t * t * (3 - 2 * t);
 // ---------------------------------------------------------------------------------------------
 // Real-world anchors, compressed for play.
 
-/** Kuching International (WBGG) runway 07/25: 3,780 m x 46 m, 068°/248° true. */
-export const KCH = {
-  runwayCenter: { x: 0, y: 0, z: 0 },
-  runwayHeading: 248, // runway 25, the preferential runway and the one pointing at Singapore
-  runwayLength: 3780,
-  runwayWidth: 46,
-};
-
-/** Singapore Changi (WSSS) runway 02C/20C: 4,000 m x 60 m, landing on 20C (heading 200°). */
-export const CHANGI_RWY = { heading: 200, length: 4000, width: 60 };
-
 /**
- * About two minutes in the air. Turns are sized so they need no more than ~22° of bank at the
- * planned speed (comfortable for passengers): r ≥ v² / (TURN_GAIN · g · tan 22°).
+ * About two minutes in the air, KLIA to Kuching. Turns are sized so they need no more than ~22° of
+ * bank at the planned speed (comfortable for passengers): r ≥ v² / (TURN_GAIN · g · tan 22°).
  */
 export const ROUTE_LEGS: Leg[] = [
   { tag: 'runway', length: 450, alt: 0 },
   { tag: 'climb', length: 1100, alt: 110 },
-  // Right turn north over Kuching, then west along the Sarawak River towards the coast.
+  // Right turn out of KLIA, past the Kuala Lumpur skyline, then east over the Titiwangsa hills.
   { tag: 'turnout', length: 2400, turn: 100, alt: 260 },
-  { tag: 'city', length: 1200, alt: 300 },
-  { tag: 'river', length: 2400, turn: -80, alt: 320 },
-  { tag: 'rainforest', length: 700, alt: 330 },
-  { tag: 'coast', length: 900, turn: -10, alt: 330 },
-  // Island-hopping over the South China Sea.
-  { tag: 'islands', length: 1000, turn: 9, alt: 320 },
-  { tag: 'islands-2', length: 1100, turn: -18, alt: 310 },
-  { tag: 'islands-3', length: 1000, turn: 9, alt: 300 },
-  { tag: 'storm-in', length: 750, turn: 12, alt: 300 },
-  { tag: 'storm', length: 1500, turn: -24, alt: 290 },
-  { tag: 'storm-out', length: 750, turn: 12, alt: 280 },
-  { tag: 'squall', length: 900, alt: 190 },
-  { tag: 'base', length: 1500, turn: -58, alt: 60 },
+  { tag: 'kl', length: 1200, alt: 300 },
+  { tag: 'hills', length: 1800, turn: 47, alt: 320 },
+  // Out over the east coast and Pulau Tioman, across the South China Sea.
+  { tag: 'coast', length: 800, turn: -10, alt: 330 },
+  { tag: 'islands', length: 1000, turn: 9, alt: 330 },
+  { tag: 'islands-2', length: 900, turn: -9, alt: 320 },
+  { tag: 'storm-in', length: 750, turn: 12, alt: 310 },
+  { tag: 'storm', length: 1300, turn: -24, alt: 300 },
+  { tag: 'storm-out', length: 750, turn: 12, alt: 290 },
+  { tag: 'squall', length: 700, alt: 220 },
+  // Home: the Sarawak coast past Mount Santubong, up the Sarawak River over Kuching, onto runway 25.
+  { tag: 'sarawak', length: 1200, turn: 50, alt: 170 },
+  { tag: 'river', length: 1400, turn: 40, alt: 135 },
+  { tag: 'kuching', length: 1000, alt: 105 },
+  { tag: 'base', length: 1500, turn: 58, alt: 60 },
   { tag: 'final', length: 1150, alt: 0, linear: true }, // 60 m over 1,150 m = 3° glide path
   { tag: 'rollout', length: 1400, alt: 0 },
 ];
 
-/** Where the take-off roll starts: 80 m past the runway 25 threshold. */
+/** Kuching International (WBGG) runway 07/25: 3,780 m x 46 m, 068°/248° true. Landing on 25. */
+export const KCH = {
+  runwayHeading: 248,
+  runwayLength: 3780,
+  runwayWidth: 46,
+};
+
+/**
+ * Kuala Lumpur International (WMKK) runway 14L/32R: 4,000 m x 60 m (compressed a little), departing
+ * on 32R. Its threshold is the world origin; the heading is whatever makes the route's final
+ * approach line up with Kuching's runway 25.
+ */
+export const KLIA = {
+  runwayHeading: (((KCH.runwayHeading - ROUTE_LEGS.reduce((a, l) => a + (l.turn ?? 0), 0)) % 360) + 360) % 360,
+  runwayLength: 4000,
+  runwayWidth: 60,
+  threshold: { x: 0, y: 0, z: 0 },
+};
+
+/** A runway designator ("25", "07", "32") from its heading. */
+export function designator(heading: number): string {
+  const n = Math.round(heading / 10) % 36 || 36;
+  return String(n).padStart(2, '0');
+}
+
+/** Where the take-off roll starts: 80 m past the KLIA runway 32R threshold. */
 export function lineupPoint(): { pos: P3; heading: number } {
-  const d = dirFromHeading(KCH.runwayHeading);
-  const half = KCH.runwayLength / 2;
+  const d = dirFromHeading(KLIA.runwayHeading);
   return {
-    pos: { x: KCH.runwayCenter.x - d.x * (half - 80), y: 0, z: KCH.runwayCenter.z - d.z * (half - 80) },
-    heading: KCH.runwayHeading,
+    pos: { x: KLIA.threshold.x + d.x * 80, y: 0, z: KLIA.threshold.z + d.z * 80 },
+    heading: KLIA.runwayHeading,
   };
 }
 
@@ -107,9 +122,10 @@ export class Route {
   readonly length: number;
   /** Distance along the route where each tagged leg starts (and `${tag}:end`). */
   readonly stations: Record<string, number> = {};
-  /** The Changi runway 20C threshold and touchdown aim point (300 m beyond it). */
-  readonly changiThreshold: P3;
-  readonly changiAim: P3;
+  /** Kuching runway 25: threshold, touchdown aim point (300 m beyond it) and runway centre. */
+  readonly kchThreshold: P3;
+  readonly kchAim: P3;
+  readonly kchCentre: P3;
 
   constructor(legs: Leg[] = ROUTE_LEGS) {
     const start = lineupPoint();
@@ -158,9 +174,11 @@ export class Route {
     this.smoothProfile();
 
     const aim = this.at(this.stations['final:end']);
-    const d = dirFromHeading(CHANGI_RWY.heading);
-    this.changiAim = { x: aim.x, y: 0, z: aim.z };
-    this.changiThreshold = { x: aim.x - d.x * 300, y: 0, z: aim.z - d.z * 300 };
+    const d = dirFromHeading(KCH.runwayHeading);
+    this.kchAim = { x: aim.x, y: 0, z: aim.z };
+    this.kchThreshold = { x: aim.x - d.x * 300, y: 0, z: aim.z - d.z * 300 };
+    const half = KCH.runwayLength / 2;
+    this.kchCentre = { x: this.kchThreshold.x + d.x * half, y: 0, z: this.kchThreshold.z + d.z * half };
   }
 
   /**

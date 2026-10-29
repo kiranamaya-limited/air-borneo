@@ -4,7 +4,20 @@ import { altitudeFt, ias, verticalSpeedFpm } from '../game/flight';
 import type { Mission } from '../game/mission';
 import type { Grade } from '../game/scoring';
 import type { LinkStatus } from '../net/link';
-import { Cabin, comfortFace } from './cabin';
+import { Cabin, comfortMood, faceSvg, type Mood } from './cabin';
+
+/** Line icons for the weather along the route (24×24, stroked in currentColor). */
+const icon = (paths: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const CLOUD = '<path d="M7 17h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 10.1 3.5 3.5 0 0 0 7 17z"/>';
+const HAZARD_ICONS = {
+  wind: icon('<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/>'),
+  updraft: icon('<path d="M12 21V9"/><path d="M8 13l4-4 4 4"/><path d="M5 5h14"/>'),
+  wave: icon('<path d="M2 12c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3"/><path d="M2 18c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3"/>'),
+  storm: icon(`<g transform="translate(0 -3)">${CLOUD}</g><path d="M12 15l-2 4h4l-2 4"/>`),
+  rain: icon(`<g transform="translate(0 -3)">${CLOUD}</g><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>`),
+  shear: icon('<path d="M12 3L2 20h20L12 3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>'),
+} as const;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -27,6 +40,8 @@ export class Hud {
   private readonly alert = $('hud-alert');
   private readonly popups = $('popups');
   private readonly atc = $('hud-atc');
+  private readonly radioLabel = $('hud-radio-label');
+  private faceMood: Mood | null = null;
   private readonly radio = $('hud-radio');
   private readonly nm = $('hud-nm');
   private readonly progress = $('hud-progress');
@@ -51,16 +66,16 @@ export class Hud {
     const st = mission.route.stations;
     const span = st['final:end'] - st['climb'];
     for (const [s, icon, label] of [
-      [st['turnout'] + 900, '💨', 'Crosswind over Kuching'],
-      [st['river'] + 1600, '☁️', 'Updrafts'],
-      [st['coast'] + 400, '🌊', 'Sea-breeze gusts'],
-      [st['storm'] + 400, '⛈️', 'Thunderstorm'],
-      [st['squall'] + 300, '🌧️', 'Sumatra squall'],
-      [st['final'] + 600, '⚠️', 'Windshear'],
+      [st['turnout'] + 900, 'wind', 'Crosswind out of KLIA'],
+      [st['hills'] + 900, 'updraft', 'Updrafts over the hills'],
+      [st['coast'] + 400, 'wave', 'Sea-breeze gusts'],
+      [st['storm'] + 400, 'storm', 'Thunderstorm'],
+      [st['squall'] + 300, 'rain', 'Squall line'],
+      [st['final'] + 600, 'shear', 'Windshear'],
     ] as const) {
       const el = document.createElement('span');
       el.className = 'hazard';
-      el.textContent = icon;
+      el.innerHTML = HAZARD_ICONS[icon];
       el.title = label;
       el.style.left = `${((s - st['climb']) / span) * 100}%`;
       track.appendChild(el);
@@ -99,7 +114,9 @@ export class Hud {
     this.calloutTimer = window.setTimeout(() => this.callout.classList.remove('show'), 1800);
   }
 
-  showAtc(text: string): void {
+  /** The radio toast: ATC by default, or the captain's cabin announcement. */
+  showAtc(text: string, label = 'Radio'): void {
+    setText(this.radioLabel, label);
     setText(this.atc, text);
     this.radio.classList.add('show');
     window.clearTimeout(this.radioTimer);
@@ -135,7 +152,11 @@ export class Hud {
     this.comfortVal.className = `score-value mono${c < 50 ? ' bad' : c < 75 ? ' warn' : ''}`;
     this.comfortBar.style.width = `${c}%`;
     this.comfortBar.style.background = c > 75 ? brand.colors.good : c > 50 ? brand.colors.yellow : brand.colors.red;
-    setText(this.face, comfortFace(c));
+    const mood = comfortMood(c);
+    if (mood !== this.faceMood) {
+      this.faceMood = mood;
+      this.face.innerHTML = faceSvg(mood);
+    }
     this.cabin.update(c, m.scorer.comfort.sickBags);
 
     setText(this.prompt, m.prompt);

@@ -51,8 +51,17 @@ async function boot(): Promise<void> {
   const hud = new Hud(mission);
   const screens = new Screens();
   const audio = new GameAudio();
-  // Start the lounge music straight away where autoplay is allowed; otherwise on the first key or tap.
+  // Start the lounge music straight away where autoplay is allowed (the installed app, the demo
+  // launcher, the Mac app); otherwise the browser holds it until the first key press or click, and
+  // a small hint says so.
   audio.init();
+  const soundHint = document.getElementById('sound-hint')!;
+  const checkSound = () => {
+    const blocked = !audio.unlocked;
+    soundHint.classList.toggle('hidden', !blocked);
+    if (blocked) window.setTimeout(checkSound, 800);
+  };
+  window.setTimeout(checkSound, 1200);
 
   // ------------------------------------------------------------------ input
   let mode: 'phone' | 'keyboard' | null = null;
@@ -229,7 +238,7 @@ async function boot(): Promise<void> {
         hud.cabin.tell(e.text);
         break;
       case 'pa':
-        hud.showAtc(`📢 ${e.text}`);
+        hud.showAtc(e.text, 'Captain · cabin announcement');
         audio.speak(e.text, 'pa');
         break;
       case 'chime':

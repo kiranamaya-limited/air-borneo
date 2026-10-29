@@ -1,6 +1,7 @@
 /**
- * Low-poly cities and sea traffic: Kuching on the Sarawak River (with the golden-roofed State
- * Legislative Assembly building), Singapore's skyline and HDB estates, and ships in the strait.
+ * Low-poly cities and sea traffic: Kuala Lumpur's skyline (the Petronas Twin Towers and KL Tower),
+ * Kuching on the Sarawak River (with the golden-roofed State Legislative Assembly building), and
+ * ships in the South China Sea.
  */
 import * as THREE from 'three';
 import { mulberry32 } from '../game/hazards';
@@ -76,6 +77,76 @@ function goldenRoof(): THREE.Group {
   return g;
 }
 
+/**
+ * The Petronas Twin Towers: two tapering eight-pointed-star towers with stepped setbacks, pinnacle
+ * spires and the skybridge between them. Scaled down to suit the compressed world.
+ */
+function twinTowers(): THREE.Group {
+  const g = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: '#cfd5dc', metalness: 0.85, roughness: 0.22, flatShading: true });
+  const star = (r: number) => {
+    const shape = new THREE.Shape();
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const rr = i % 2 ? r * 0.8 : r;
+      const px = Math.cos(a) * rr;
+      const py = Math.sin(a) * rr;
+      if (i === 0) shape.moveTo(px, py);
+      else shape.lineTo(px, py);
+    }
+    return shape;
+  };
+  const tower = () => {
+    const t = new THREE.Group();
+    // Stepped tiers, each a little narrower.
+    const tiers: [number, number][] = [
+      [14, 120],
+      [12.5, 40],
+      [11, 26],
+      [9, 16],
+      [7, 12],
+    ];
+    let y = 0;
+    tiers.forEach(([r, h]) => {
+      const geo = new THREE.ExtrudeGeometry(star(r), { depth: h, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2);
+      const m = new THREE.Mesh(geo, steel);
+      m.position.y = y;
+      t.add(m);
+      y += h;
+    });
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(2.2, 46, 8), steel);
+    spire.position.y = y + 23;
+    t.add(spire);
+    return t;
+  };
+  const a = tower();
+  const b = tower();
+  a.position.x = -26;
+  b.position.x = 26;
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(30, 5, 6), steel);
+  bridge.position.y = 92;
+  g.add(a, b, bridge);
+  g.traverse((o) => (o.castShadow = true));
+  return g;
+}
+
+/** Menara Kuala Lumpur: a slim shaft with its glass pod and antenna. */
+function klTower(): THREE.Group {
+  const g = new THREE.Group();
+  const concrete = new THREE.MeshStandardMaterial({ color: '#e6e3dc', roughness: 0.6 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 7, 150, 12), concrete);
+  shaft.position.y = 75;
+  const pod = new THREE.Mesh(new THREE.SphereGeometry(16, 16, 10), new THREE.MeshStandardMaterial({ color: '#3f6e8c', metalness: 0.6, roughness: 0.2 }));
+  pod.scale.y = 0.75;
+  pod.position.y = 156;
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.6, 40, 8), concrete);
+  mast.position.y = 186;
+  g.add(shaft, pod, mast);
+  g.traverse((o) => (o.castShadow = true));
+  return g;
+}
+
 function ship(rand: () => number): THREE.Group {
   const g = new THREE.Group();
   const len = 160 + rand() * 120;
@@ -113,6 +184,17 @@ export function buildCities(field: Heightfield): THREE.Group {
   const group = new THREE.Group();
   group.name = 'cities';
 
+  // Kuala Lumpur: a dense cluster of towers with the Twin Towers and KL Tower at its heart.
+  const kl = field.klCity;
+  group.add(towers(field, kl, 1500, 160, 40, 170, 21, ['#dfe7ee', '#c9d6e2', '#eef1f4', '#b8c8d6', '#f4f4f4'], [22, 46]));
+  group.add(towers(field, kl, 2700, 260, 12, 60, 23, ['#f4f1ea', '#e7efe9', '#f2e6dc', '#e5e9f2'], [14, 26]));
+  const petronas = twinTowers();
+  petronas.position.set(kl.x, field.height(kl.x, kl.z) - 1, kl.z);
+  group.add(petronas);
+  const menara = klTower();
+  menara.position.set(kl.x - 520, field.height(kl.x - 520, kl.z + 260) - 1, kl.z + 260);
+  group.add(menara);
+
   // Kuching: mostly low-rise with a handful of towers, around the river.
   const kc = field.kuchingCity;
   group.add(towers(field, kc, 2600, 520, 8, 70, 11, ['#f2efe8', '#e8e2d6', '#f5f5f2', '#dcd6c9', '#e9eef2'], [14, 40]));
@@ -120,25 +202,14 @@ export function buildCities(field: Heightfield): THREE.Group {
   dun.position.set(kc.x + 380, field.height(kc.x + 380, kc.z - 420) + 0.5, kc.z - 420);
   group.add(dun);
 
-  // Singapore: a downtown cluster of towers WSW of Changi and HDB estates around it.
-  const c = field.changi;
-  const downtown = c.toWorld(5200, 5600);
-  group.add(towers(field, downtown, 1500, 120, 60, 260, 21, ['#dfe7ee', '#c9d6e2', '#eef1f4', '#b8c8d6', '#f4f4f4'], [24, 50]));
-  for (const [u, v] of [
-    [2400, 2600],
-    [5400, 2200],
-    [2000, 5000],
-    [7600, 3600],
-    [3800, 8200],
-  ]) {
-    group.add(towers(field, c.toWorld(u, v), 900, 90, 30, 60, u + v, ['#f4f1ea', '#e7efe9', '#f2e6dc', '#e5e9f2'], [14, 22]));
-  }
-
-  // Ships at anchor and under way east of Singapore.
+  // Ships under way in the South China Sea, off the Sarawak coast.
   const rand = mulberry32(5);
-  for (let i = 0; i < 9; i++) {
+  const bc = field.borneoCoast;
+  for (let i = 0; i < 12; i++) {
     const s = ship(rand);
-    const p = c.toWorld(-2800 - rand() * 4500, -4200 + rand() * 6000);
+    const along = -1500 + rand() * 6000;
+    const out = 900 + rand() * 3500;
+    const p = { x: bc.x - bc.nz * along - bc.nx * out, z: bc.z + bc.nx * along - bc.nz * out };
     if (field.info(p.x, p.z).region !== 'sea') continue;
     s.position.set(p.x, -2, p.z);
     s.rotation.y = rand() * Math.PI * 2;

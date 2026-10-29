@@ -47,7 +47,10 @@ export function buildTerrain(field: Heightfield, route: Route): THREE.Group {
     else if (g.airport) c.copy(COLORS.grass);
     else if (g.inland < 0.08) c.copy(COLORS.sand);
     else if (g.urban > 0.35) c.copy(COLORS.urban).lerp(COLORS.grass, 0.4 - g.urban * 0.3);
-    else if (g.region === 'singapore') c.copy(COLORS.sgGreen).lerp(COLORS.forest, 0.3 + n * 0.2);
+    else if (g.region === 'peninsula' && g.inland > 0.25 && g.h < 60 && Math.sin(x / 520 + Math.sin(z / 700) * 2) * Math.cos(z / 430) > 0.1) {
+      // Oil palm estates around KLIA and the lowlands.
+      c.copy(COLORS.palm).lerp(COLORS.sgGreen, 0.3 + n * 0.2);
+    }
     else if (g.h > 300) c.copy(COLORS.hill).lerp(COLORS.rock, Math.min(1, (g.h - 300) / 500));
     else if (g.inland < 0.25) c.copy(COLORS.mud).lerp(COLORS.palm, g.inland * 4);
     else {
@@ -101,7 +104,6 @@ function buildForest(field: Heightfield, route: Route): THREE.InstancedMesh {
       if (field.keepClear(x, z)) continue;
       const g = field.info(x, z);
       if (g.region === 'sea' || g.river || g.inland < 0.18 || g.urban > 0.3 || g.h < 0.5) continue;
-      if (g.region === 'singapore' && rand() < 0.6) continue;
       const r = 9 + rand() * 12;
       p.set(x, g.h + r * 0.45, z);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI);

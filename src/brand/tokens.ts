@@ -32,10 +32,10 @@ export const brand = {
 export const flight = {
   callsign: 'AirBorneo 101',
   flightNo: 'AB 101',
-  from: { code: 'KCH', icao: 'WBGG', name: 'Kuching International', city: 'Kuching' },
-  to: { code: 'SIN', icao: 'WSSS', name: 'Singapore Changi', city: 'Singapore' },
-  distanceNm: 381, // great-circle KCH-SIN
-  blockTime: '1h 30m',
+  from: { code: 'KUL', icao: 'WMKK', name: 'Kuala Lumpur International', city: 'Kuala Lumpur' },
+  to: { code: 'KCH', icao: 'WBGG', name: 'Kuching International', city: 'Kuching' },
+  distanceNm: 523, // great-circle KUL-KCH
+  blockTime: '1h 45m',
   aircraft: 'ATR 72-500',
   passengers: 68,
 } as const;

@@ -2,7 +2,7 @@
  * Airport layout in runway-aligned coordinates, shared by the 3D world and the mission logic.
  * u = metres along the runway (direction of the active runway heading), v = metres to the right.
  */
-import { CHANGI_RWY, KCH, dirFromHeading, type Route } from './route';
+import { KCH, KLIA, dirFromHeading, type Route } from './route';
 
 export interface Frame {
   heading: number;
@@ -24,8 +24,29 @@ export function makeFrame(originX: number, originZ: number, heading: number): Fr
   };
 }
 
+/** KLIA: origin at the runway 32R threshold, u along the take-off direction. Terminal to the right. */
+export const kliaFrame = makeFrame(KLIA.threshold.x, KLIA.threshold.z, KLIA.runwayHeading);
+
+export const KLIA_LAYOUT = {
+  length: KLIA.runwayLength,
+  width: KLIA.runwayWidth,
+  taxiwayV: 210,
+  apron: { u0: 1300, u1: 2300, v0: 270, v1: 470 },
+  hangar: { u0: 1350, u1: 2250, v0: 500, v1: 600 },
+  terminal: { u0: 2500, u1: 3700, v0: 380, v1: 700 },
+  tower: { u: 2350, v: 460 },
+  stand: { u: 1800, v: 360 },
+};
+
 /** Kuching: origin at the runway centre, u along runway 25 (248°). Terminal on the north side. */
-export const kchFrame = makeFrame(KCH.runwayCenter.x, KCH.runwayCenter.z, KCH.runwayHeading);
+export function kchFrame(route: Route): Frame {
+  return makeFrame(route.kchCentre.x, route.kchCentre.z, KCH.runwayHeading);
+}
+
+/** Kuching landing frame: origin at the runway 25 threshold, u along the landing direction. */
+export function kchLandingFrame(route: Route): Frame {
+  return makeFrame(route.kchThreshold.x, route.kchThreshold.z, KCH.runwayHeading);
+}
 
 export const KCH_LAYOUT = {
   halfLength: KCH.runwayLength / 2,
@@ -36,36 +57,4 @@ export const KCH_LAYOUT = {
   tower: { u: -350, v: 380 },
   hangar: { u: 250, v: 300 },
   stand: { u: -1150, v: 300 },
-};
-
-/** Taxi route from the stand to the runway 25 line-up point, as (u, v) points. */
-export function kchTaxiPath(): { u: number; v: number }[] {
-  const L = KCH_LAYOUT;
-  const thr = -L.halfLength;
-  return [
-    { u: L.stand.u, v: L.stand.v },
-    { u: L.stand.u, v: 250 },
-    { u: L.stand.u - 60, v: L.taxiwayV },
-    { u: -1500, v: L.taxiwayV },
-    { u: thr + 120, v: L.taxiwayV },
-    { u: thr + 20, v: 120 },
-    { u: thr + 35, v: 25 },
-    { u: thr + 80, v: 0 },
-  ];
-}
-
-/** Changi frame: origin at the 20C threshold, u along 200°. Cargo and terminals to the right (west). */
-export function changiFrame(route: Route): Frame {
-  return makeFrame(route.changiThreshold.x, route.changiThreshold.z, CHANGI_RWY.heading);
-}
-
-export const CHANGI_LAYOUT = {
-  length: CHANGI_RWY.length,
-  width: CHANGI_RWY.width,
-  taxiwayV: 210,
-  cargoApron: { u0: 1300, u1: 2300, v0: 270, v1: 470 },
-  cargoSheds: { u0: 1350, u1: 2250, v0: 500, v1: 600 },
-  terminal: { u0: 2500, u1: 3700, v0: 380, v1: 700 },
-  tower: { u: 2350, v: 460 },
-  cargoStand: { u: 1800, v: 360 },
 };

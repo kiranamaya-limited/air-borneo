@@ -1,10 +1,11 @@
 /**
  * The ground: an analytic height function shared by the terrain mesh, tree placement and the
- * mission's collision checks. Western Sarawak (rainforest, Kuching, Mount Santubong) gives way to
- * the South China Sea, then Singapore's east coast and Changi.
+ * mission's collision checks. Peninsular Malaysia (KLIA's oil palm, Kuala Lumpur, the Titiwangsa
+ * hills) gives way to the South China Sea and its islands, then home: the Sarawak coast, Mount
+ * Santubong, the Sarawak River, Kuching and its airport.
  */
 import { dirFromHeading, type Route } from '../game/route';
-import { CHANGI_LAYOUT, KCH_LAYOUT, changiFrame, kchFrame, type Frame } from '../game/layout';
+import { KCH_LAYOUT, KLIA_LAYOUT, kchFrame, kliaFrame, type Frame } from '../game/layout';
 import { mulberry32 } from '../game/hazards';
 
 export const SEA_LEVEL = -2;
@@ -65,7 +66,7 @@ const smooth = (e0: number, e1: number, x: number) => {
 
 // ---------------------------------------------------------------------------------- terrain
 
-export type Region = 'sea' | 'borneo' | 'singapore' | 'island';
+export type Region = 'sea' | 'peninsula' | 'borneo' | 'island';
 
 export interface GroundInfo {
   h: number;
@@ -78,47 +79,55 @@ export interface GroundInfo {
 }
 
 export class Heightfield {
-  readonly kch: Frame = kchFrame;
-  readonly changi: Frame;
+  readonly klia: Frame = kliaFrame;
+  readonly kch: Frame;
+  /** Peninsular Malaysia's east coast: land behind it (against n). */
+  readonly eastCoast: { x: number; z: number; nx: number; nz: number };
+  /** The Sarawak coast: land ahead of it (along n), as far as `westLimit` along the shore. */
   readonly borneoCoast: { x: number; z: number; nx: number; nz: number };
-  readonly sgCoast: { x: number; z: number; nx: number; nz: number };
   readonly santubong: { x: number; z: number };
   readonly kuchingCity: { x: number; z: number };
+  readonly klCity: { x: number; z: number };
+  readonly titiwangsa: { x: number; z: number };
   readonly islands: { x: number; z: number; r: number }[] = [];
   private readonly river: { x: number; z: number }[] = [];
 
   constructor(route: Route) {
-    this.changi = changiFrame(route);
-    const c1 = route.at(route.stations['coast'] + 380);
-    const d1 = dirFromHeading(c1.heading);
-    this.borneoCoast = { x: c1.x, z: c1.z, nx: d1.x, nz: d1.z };
-    // Mount Santubong (810 m) stands on the coast north of the track, to the right when flying west.
-    const right = { x: -d1.z, z: d1.x };
-    this.santubong = { x: c1.x + right.x * 3200 - d1.x * 500, z: c1.z + right.z * 3200 - d1.z * 500 };
-
-    const thr = route.changiThreshold;
-    const f = dirFromHeading(200);
-    this.sgCoast = { x: thr.x - f.x * 520, z: thr.z - f.z * 520, nx: f.x, nz: f.z };
-
-    // Kuching sits under the northbound "city" leg; the Sarawak River runs from upstream east of the
-    // city, through it, then west beneath the "river" leg to the sea.
-    const at = (s: number, rightOff: number) => {
+    this.kch = kchFrame(route);
+    const st = route.stations;
+    const at = (s: number, rightOff: number, ahead = 0) => {
       const p = route.at(s);
       const d = dirFromHeading(p.heading);
-      return { x: p.x - d.z * rightOff, z: p.z + d.x * rightOff };
+      return { x: p.x - d.z * rightOff + d.x * ahead, z: p.z + d.x * rightOff + d.z * ahead };
     };
-    const st = route.stations;
-    const city = at(st['city'] + 750, -250);
+
+    const e = route.at(st['coast'] + 380);
+    const de = dirFromHeading(e.heading);
+    this.eastCoast = { x: e.x, z: e.z, nx: de.x, nz: de.z };
+    // Kuala Lumpur's towers stand off the left wing after the turn out of KLIA.
+    this.klCity = at(st['kl'] + 600, -1250);
+    this.titiwangsa = at(st['hills'] + 900, 400);
+
+    // Borneo: the shore runs roughly east-west where the route crosses it, curving round so that
+    // Kuching and its airport (south-west of the crossing) are well inland.
+    const c = route.at(st['sarawak'] + 300);
+    const n = { x: 0.0995, z: 0.995 };
+    this.borneoCoast = { x: c.x, z: c.z, nx: n.x, nz: n.z };
+    // Mount Santubong (810 m) on its peninsula, off the left wing as the coast comes up.
+    this.santubong = at(st['sarawak'] + 200, -1800, 300);
+    // Kuching sits on the river under the "kuching" leg; the Sarawak River runs from the sea past
+    // Santubong, south beneath the "river" leg, through the city and on upstream.
+    const city = at(st['kuching'] + 450, 120);
     this.kuchingCity = city;
-    const upstream = dirFromHeading(100);
+    const upstream = dirFromHeading(120);
     const riverPts = [
-      { x: city.x + upstream.x * 4200, z: city.z + upstream.z * 4200 },
-      { x: city.x + upstream.x * 1800, z: city.z + upstream.z * 1800 + 300 },
+      at(st['sarawak'] + 500, -700),
+      at(st['sarawak'] + 1000, -350),
+      at(st['river'] + 500, -320),
+      at(st['river'] + 1200, -260),
       city,
-      at(st['river'] + 700, 380),
-      at(st['river'] + 1700, 480),
-      at(st['rainforest'] + 300, 520),
-      { x: c1.x + right.x * 1700 + d1.x * 120, z: c1.z + right.z * 1700 + d1.z * 120 },
+      { x: city.x + upstream.x * 1800, z: city.z + upstream.z * 1800 + 300 },
+      { x: city.x + upstream.x * 4200, z: city.z + upstream.z * 4200 },
     ];
     for (let i = 0; i < riverPts.length - 1; i++) {
       for (let k = 0; k < 20; k++) {
@@ -127,17 +136,40 @@ export class Heightfield {
       }
     }
 
-    // A few islands in the South China Sea, kept clear of the route itself.
+    // Pulau Tioman and other islands in the South China Sea, kept clear of the route itself.
     const rand = mulberry32(42);
-    const s0 = route.stations['coast:end'] + 400;
-    const s1 = route.stations['base'] + 300;
-    for (let i = 0; i < 16; i++) {
+    const s0 = st['coast:end'] + 300;
+    const s1 = st['squall'];
+    for (let i = 0; i < 40 && this.islands.length < 14; i++) {
       const p = route.at(s0 + (s1 - s0) * rand());
       const d = dirFromHeading(p.heading);
       const side = rand() < 0.5 ? -1 : 1;
       const off = side * (650 + rand() * 3200);
-      this.islands.push({ x: p.x - d.z * off, z: p.z + d.x * off, r: 180 + rand() * 520 });
+      const isl = { x: p.x - d.z * off, z: p.z + d.x * off, r: 180 + rand() * 520 };
+      if (this.peninsulaOut(isl.x, isl.z) < isl.r + 600 || this.borneoIn(isl.x, isl.z) > -isl.r - 600) continue;
+      this.islands.push(isl);
     }
+    // Tioman itself: big, hilly and off the right wing.
+    const tioman = at(st['islands'] + 400, 2600);
+    this.islands.push({ x: tioman.x, z: tioman.z, r: 900 });
+  }
+
+  /** Metres seaward of Peninsular Malaysia's east coast (negative = on land). */
+  private peninsulaOut(x: number, z: number): number {
+    const ec = this.eastCoast;
+    const along = (x - ec.x) * -ec.nz + (z - ec.z) * ec.nx;
+    return (x - ec.x) * ec.nx + (z - ec.z) * ec.nz - (200 * Math.sin(along / 1100) + 110 * Math.sin(along / 370 + 1.3));
+  }
+
+  /** Metres inland of the Sarawak coast (negative = at sea). */
+  private borneoIn(x: number, z: number): number {
+    const bc = this.borneoCoast;
+    const along = (x - bc.x) * -bc.nz + (z - bc.z) * bc.nx; // + = west along the shore
+    const inland = (x - bc.x) * bc.nx + (z - bc.z) * bc.nz - (120 * Math.sin(along / 900 + 0.7) + 60 * Math.sin(along / 310));
+    const westEdge = 7200 + 400 * Math.sin(z / 1300) - along;
+    // Santubong's peninsula pushes out to sea.
+    const sd = Math.hypot(x - this.santubong.x, z - this.santubong.z);
+    return Math.max(Math.min(inland, westEdge), 1700 - sd);
   }
 
   private riverDist(x: number, z: number): number {
@@ -151,21 +183,9 @@ export class Heightfield {
   }
 
   info(x: number, z: number): GroundInfo {
-    // Borneo: land behind a wiggly coastline.
-    const bc = this.borneoCoast;
-    const along1 = (x - bc.x) * -bc.nz + (z - bc.z) * bc.nx;
-    const out1 = (x - bc.x) * bc.nx + (z - bc.z) * bc.nz - (200 * Math.sin(along1 / 1100) + 110 * Math.sin(along1 / 370 + 1.3));
-    // Santubong peninsula pushes out to sea.
-    const sx = x - this.santubong.x;
-    const sz = z - this.santubong.z;
-    const sd = Math.hypot(sx, sz);
-    const borneoOut = Math.min(out1, sd - 1500);
-
-    // Singapore: land beyond its north-east coast, bounded to the east.
-    const sc = this.sgCoast;
-    const along2 = (x - sc.x) * -sc.nz + (z - sc.z) * sc.nx;
-    const in2 = (x - sc.x) * sc.nx + (z - sc.z) * sc.nz - (90 * Math.sin(along2 / 700) + 50 * Math.sin(along2 / 260 + 2));
-    const sgIn = Math.min(in2, along2 + 2600 + 150 * Math.sin((x + z) / 900));
+    const penOut = this.peninsulaOut(x, z);
+    const borIn = this.borneoIn(x, z);
+    const sd = Math.hypot(x - this.santubong.x, z - this.santubong.z);
 
     let island = -Infinity;
     for (const isl of this.islands) {
@@ -174,24 +194,28 @@ export class Heightfield {
       island = Math.max(island, isl.r * wob - d);
     }
 
-    const k = kchFrame.toLocal(x, z);
-    const c = this.changi.toLocal(x, z);
+    const k = this.kch.toLocal(x, z);
+    const l = this.klia.toLocal(x, z);
     const kchAirport = Math.max(0, 1 - Math.max(Math.abs(k.u) - 2250, -k.v - 450, k.v - 750, 0) / 250);
-    const sgAirport = Math.max(0, 1 - Math.max(-c.u - 1000, c.u - 4600, -c.v - 380, c.v - 900, 0) / 250);
+    const kliaAirport = Math.max(0, 1 - Math.max(-l.u - 1000, l.u - 4600, -l.v - 380, l.v - 900, 0) / 250);
 
     let h: number;
     let region: Region;
     let inland: number;
-    if (borneoOut < 0) {
+    if (penOut < 0) {
+      region = 'peninsula';
+      inland = smooth(0, 1400, -penOut);
+      const hills = Math.max(0, fbm(x / 2600, z / 2600)) * 110 + fbm(x / 700, z / 700, 3) * 14;
+      h = 0.6 + inland * (6 + hills) - Math.max(0, 1 - -penOut / 160) * 2.4;
+      // The Titiwangsa range: forested ridges east of Kuala Lumpur.
+      const td = Math.hypot(x - this.titiwangsa.x, z - this.titiwangsa.z);
+      h += 120 * Math.exp(-((td / 2200) ** 2)) * (0.75 + 0.25 * fbm(x / 400, z / 400)) * inland;
+    } else if (borIn > 0) {
       region = 'borneo';
-      inland = smooth(0, 1400, -borneoOut);
-      const hills = Math.max(0, fbm(x / 2600, z / 2600)) * 150 + fbm(x / 700, z / 700, 3) * 18;
-      h = 0.6 + inland * (6 + hills) - Math.max(0, 1 - -borneoOut / 160) * 2.4;
+      inland = smooth(0, 1400, borIn);
+      const hills = Math.max(0, fbm(x / 2600, z / 2600)) * 130 + fbm(x / 700, z / 700, 3) * 16;
+      h = 0.6 + inland * (6 + hills) - Math.max(0, 1 - borIn / 160) * 2.4;
       h += 810 * Math.exp(-((sd / 900) ** 2)) * (0.85 + 0.15 * fbm(x / 300, z / 300));
-    } else if (sgIn > 0) {
-      region = 'singapore';
-      inland = smooth(0, 900, sgIn);
-      h = 0.6 + inland * (4 + Math.max(0, fbm(x / 1800, z / 1800)) * 40) - Math.max(0, 1 - sgIn / 120) * 2.4;
     } else if (island > 0) {
       region = 'island';
       inland = smooth(0, 300, island);
@@ -199,7 +223,7 @@ export class Heightfield {
     } else {
       region = 'sea';
       inland = 0;
-      const shore = Math.max(-borneoOut, sgIn, island);
+      const shore = Math.max(penOut > 0 ? -penOut : 0, borIn, island);
       h = SEA_LEVEL - 1 - Math.min(30, -shore / 60);
     }
 
@@ -215,12 +239,12 @@ export class Heightfield {
     }
 
     // Flatten the airports exactly to y = 0.
-    const flat = Math.max(kchAirport, sgAirport);
+    const flat = Math.max(kchAirport, kliaAirport);
     if (flat > 0) h = h * (1 - flat) - 1.4 * flat;
 
-    const cityD = Math.hypot(x - this.kuchingCity.x, z - this.kuchingCity.z);
-    let urban = region === 'borneo' ? smooth(2600, 800, cityD) : 0;
-    if (region === 'singapore') urban = Math.max(0, Math.min(1, (fbm(x / 1500, z / 1500) + 0.25) * 2)) * smooth(400, 1500, sgIn);
+    let urban = 0;
+    if (region === 'borneo') urban = smooth(2600, 800, Math.hypot(x - this.kuchingCity.x, z - this.kuchingCity.z));
+    if (region === 'peninsula') urban = smooth(2800, 900, Math.hypot(x - this.klCity.x, z - this.klCity.z));
     if (urban > 0 && !river && flat === 0) h = Math.min(h, 2 + urban * 4 + (1 - urban) * h);
 
     return { h, region, inland, airport: flat > 0.5, urban, river };
@@ -237,13 +261,13 @@ export class Heightfield {
 
   /** Zones where nothing should be planted. */
   keepClear(x: number, z: number): boolean {
-    const k = kchFrame.toLocal(x, z);
+    const k = this.kch.toLocal(x, z);
     if (Math.abs(k.u) < 2600 && k.v > -700 && k.v < 1000) return true;
-    const c = this.changi.toLocal(x, z);
-    if (c.u > -1300 && c.u < 4900 && c.v > -600 && c.v < 1100) return true;
+    const l = this.klia.toLocal(x, z);
+    if (l.u > -1300 && l.u < 4900 && l.v > -600 && l.v < 1100) return true;
     return false;
   }
 
   static readonly kchLayout = KCH_LAYOUT;
-  static readonly changiLayout = CHANGI_LAYOUT;
+  static readonly kliaLayout = KLIA_LAYOUT;
 }

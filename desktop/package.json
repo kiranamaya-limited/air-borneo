@@ -1,8 +1,8 @@
 {
   "name": "airborneo-desktop",
-  "productName": "AirBorneo Connecting You",
+  "productName": "AirBorneo Coming Home",
   "version": "0.1.0",
-  "description": "Offline Mac app for the AirBorneo Connecting You demo.",
+  "description": "Offline Mac app for the AirBorneo Coming Home demo.",
   "private": true,
   "main": "main.cjs",
   "scripts": {
@@ -21,13 +21,13 @@
   },
   "build": {
     "appId": "com.airborneo.connectingyou",
-    "productName": "AirBorneo Connecting You",
+    "productName": "AirBorneo Coming Home",
     "files": ["main.cjs", "serve.mjs", "app/**/*", "package.json"],
     "mac": {
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
       "category": "public.app-category.games",
       "identity": null
     },
-    "dmg": { "title": "AirBorneo Connecting You" }
+    "dmg": { "title": "AirBorneo Coming Home" }
   }
 }

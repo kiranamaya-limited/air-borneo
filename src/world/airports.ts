@@ -1,12 +1,14 @@
 /**
- * Kuching International (WBGG) and Singapore Changi (WSSS), built from published dimensions:
- * runway 07/25 at Kuching is 3,780 x 46 m on 068°/248°; Changi 02C/20C is 4,000 x 60 m.
+ * Kuala Lumpur International (WMKK) and Kuching International (WBGG), built from published
+ * dimensions: KLIA's runway 14L/32R is about 4,000 x 60 m; Kuching's 07/25 is 3,780 x 46 m on
+ * 068°/248°.
  * Markings follow ICAO Annex 14: threshold piano keys, designators, 30 m centreline dashes with
  * 20 m gaps, aiming point and touchdown zone bars, edge lines. PAPI and approach lights work.
  */
 import * as THREE from 'three';
 import { brand } from '../brand/tokens';
-import { CHANGI_LAYOUT, KCH_LAYOUT, kchFrame, type Frame } from '../game/layout';
+import { KCH_LAYOUT, KLIA_LAYOUT, kchFrame, kliaFrame, type Frame } from '../game/layout';
+import { designator as runwayName, type Route } from '../game/route';
 import { AircraftModel } from './aircraft';
 import type { Aircraft } from '../game/flight';
 
@@ -252,20 +254,64 @@ export class Airports {
   private rabbitCount = 0;
   readonly parked: AircraftModel[] = [];
 
-  constructor(private readonly changi: Frame) {
+  private readonly kch: Frame;
+
+  constructor(route: Route) {
+    this.kch = kchFrame(route);
     const asphalt = asphaltTexture();
+    this.buildKlia(asphalt);
     this.buildKuching(asphalt);
-    this.buildChangi(asphalt);
   }
 
+  /** Approach lighting before a threshold at u = thr: 900 m of crossbars and a sequenced "rabbit". */
+  private approachLights(g: THREE.Group, f: Frame, thr: number): void {
+    const bars: { u: number; v: number }[] = [];
+    const rabbit: { u: number; v: number }[] = [];
+    for (let u = -900; u <= -30; u += 30) {
+      for (let v = -6; v <= 6; v += 3) bars.push({ u: thr + u, v });
+      if (u === -300) for (let v = -15; v <= 15; v += 3) if (Math.abs(v) > 6) bars.push({ u: thr + u, v });
+      rabbit.push({ u: thr + u, v: 0 });
+    }
+    const lightGeo = new THREE.SphereGeometry(0.5, 6, 4);
+    const barMesh = new THREE.InstancedMesh(lightGeo, new THREE.MeshBasicMaterial({ color: '#fff4d6' }), bars.length);
+    const m = new THREE.Matrix4();
+    bars.forEach((b, i) => {
+      const w = f.toWorld(b.u, b.v);
+      m.makeTranslation(w.x, 1.2, w.z);
+      barMesh.setMatrixAt(i, m);
+    });
+    barMesh.frustumCulled = false;
+    g.add(barMesh);
+    this.rabbit = new THREE.InstancedMesh(new THREE.SphereGeometry(1.4, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff' }), rabbit.length);
+    rabbit.forEach((b, i) => {
+      const w = f.toWorld(b.u, b.v);
+      m.makeTranslation(w.x, 2, w.z);
+      this.rabbit.setMatrixAt(i, m);
+    });
+    this.rabbit.frustumCulled = false;
+    this.rabbitCount = rabbit.length;
+    g.add(this.rabbit);
+    const stanchions = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 3, 0.4), new THREE.MeshStandardMaterial({ color: '#c7c9cc' }), rabbit.length);
+    rabbit.forEach((b, i) => {
+      const w = f.toWorld(b.u, b.v);
+      m.makeTranslation(w.x, 0, w.z);
+      stanchions.setMatrixAt(i, m);
+    });
+    g.add(stanchions);
+  }
+
+  /** Kuching International: home. Landing on runway 25, with approach lights and a PAPI. */
   private buildKuching(asphalt: THREE.Texture): void {
-    const f = kchFrame;
+    const f = this.kch;
     const L = KCH_LAYOUT;
     const g = new THREE.Group();
     g.name = 'WBGG';
     g.add(quads(f, [{ u: 0, v: 150, lu: 5000, lv: 1500 }], '#6f9a4f', GRASS_Y));
     const rwy = buildRunway({ frame: f, u0: -L.halfLength, u1: L.halfLength, width: L.width, names: ['25', '07'] }, asphalt);
     g.add(rwy.group);
+    this.papi = rwy.papi;
+    this.papiAt = f.toWorld(rwy.papiAt.u, rwy.papiAt.v);
+    this.approachLights(g, f, -L.halfLength);
 
     // Taxiways, connectors, apron.
     const taxi: Rect[] = [
@@ -368,52 +414,17 @@ export class Airports {
     this.group.add(g);
   }
 
-  private buildChangi(asphalt: THREE.Texture): void {
-    const f = this.changi;
-    const L = CHANGI_LAYOUT;
+  /** Kuala Lumpur International: departure from runway 32R. */
+  private buildKlia(asphalt: THREE.Texture): void {
+    const f = kliaFrame;
+    const L = KLIA_LAYOUT;
     const g = new THREE.Group();
-    g.name = 'WSSS';
+    g.name = 'WMKK';
     g.add(quads(f, [{ u: 1800, v: 250, lu: 6000, lv: 1500 }], '#73a052', GRASS_Y));
-    const rwy = buildRunway({ frame: f, u0: 0, u1: L.length, width: L.width, names: ['20C', '02C'] }, asphalt);
+    const dep = runwayName(f.heading);
+    const opp = runwayName((f.heading + 180) % 360);
+    const rwy = buildRunway({ frame: f, u0: 0, u1: L.length, width: L.width, names: [`${dep}R`, `${opp}L`] }, asphalt);
     g.add(rwy.group);
-    this.papi = rwy.papi;
-    this.papiAt = f.toWorld(rwy.papiAt.u, rwy.papiAt.v);
-
-    // Approach lighting: 900 m of crossbars and a sequenced-flasher "rabbit".
-    const bars: { u: number; v: number }[] = [];
-    const rabbit: { u: number; v: number }[] = [];
-    for (let u = -900; u <= -30; u += 30) {
-      for (let v = -6; v <= 6; v += 3) bars.push({ u, v });
-      if (u % 60 === 0) for (let v = -15; v <= 15; v += 3) if (Math.abs(v) > 6 && u === -300) bars.push({ u, v });
-      rabbit.push({ u, v: 0 });
-    }
-    const lightGeo = new THREE.SphereGeometry(0.5, 6, 4);
-    const barMesh = new THREE.InstancedMesh(lightGeo, new THREE.MeshBasicMaterial({ color: '#fff4d6' }), bars.length);
-    const m = new THREE.Matrix4();
-    bars.forEach((b, i) => {
-      const w = f.toWorld(b.u, b.v);
-      m.makeTranslation(w.x, 1.2, w.z);
-      barMesh.setMatrixAt(i, m);
-    });
-    barMesh.frustumCulled = false;
-    g.add(barMesh);
-    this.rabbit = new THREE.InstancedMesh(new THREE.SphereGeometry(1.4, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff' }), rabbit.length);
-    rabbit.forEach((b, i) => {
-      const w = f.toWorld(b.u, b.v);
-      m.makeTranslation(w.x, 2, w.z);
-      this.rabbit.setMatrixAt(i, m);
-    });
-    this.rabbit.frustumCulled = false;
-    this.rabbitCount = rabbit.length;
-    g.add(this.rabbit);
-    // Light stanchions over the sea.
-    const stanchions = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 6, 0.4), new THREE.MeshStandardMaterial({ color: '#c7c9cc' }), rabbit.length);
-    rabbit.forEach((b, i) => {
-      const w = f.toWorld(b.u, b.v);
-      m.makeTranslation(w.x, -1.5, w.z);
-      stanchions.setMatrixAt(i, m);
-    });
-    g.add(stanchions);
 
     const taxi: Rect[] = [
       { u: 2000, v: L.taxiwayV, lu: 4300, lv: 23 },
@@ -421,26 +432,32 @@ export class Airports {
       { u: 2200, v: 105, lu: 30, lv: 210 },
       { u: 3000, v: 105, lu: 30, lv: 210 },
       { u: 3950, v: 105, lu: 30, lv: 210 },
-      { u: L.cargoStand.u, v: 245, lu: 30, lv: 60 },
+      { u: L.stand.u, v: 245, lu: 30, lv: 60 },
     ];
     g.add(quads(f, taxi, '#45494f', PAVEMENT_Y));
-    const A = L.cargoApron;
+    const A = L.apron;
     g.add(quads(f, [{ u: (A.u0 + A.u1) / 2, v: (A.v0 + A.v1) / 2, lu: A.u1 - A.u0, lv: A.v1 - A.v0 }], '#a5a8aa', PAVEMENT_Y + 0.05));
     const yellow: Rect[] = [{ u: 2000, v: L.taxiwayV, lu: 4300, lv: 0.5 }];
     for (let u = A.u0 + 100; u < A.u1; u += 100) yellow.push({ u, v: 360, lu: 0.5, lv: 160 });
     g.add(quads(f, yellow, brand.colors.yellow, Y));
 
-    // Cargo sheds.
-    const S = L.cargoSheds;
+    // AirBorneo's KLIA hangar.
+    const S = L.hangar;
     const shedSign = canvasTexture(2048, 256, (ctx) => {
       ctx.fillStyle = '#dfe4ea';
       ctx.fillRect(0, 0, 2048, 256);
       ctx.fillStyle = '#b8c0c9';
       for (let x = 0; x < 2048; x += 120) ctx.fillRect(x + 10, 120, 100, 136);
-      ctx.fillStyle = '#20406a';
+      ctx.fillStyle = brand.colors.yellow;
+      ctx.fillRect(0, 96, 2048, 8);
+      ctx.fillStyle = brand.colors.red;
+      ctx.fillRect(0, 104, 2048, 8);
+      ctx.fillStyle = brand.colors.black;
+      ctx.fillRect(0, 112, 2048, 8);
+      ctx.fillStyle = brand.colors.ink;
       ctx.font = `800 64px ${brand.fonts.ui}`;
       ctx.textAlign = 'center';
-      ctx.fillText('CHANGI AIRFREIGHT CENTRE', 1024, 84);
+      ctx.fillText('AirBorneo · Kuala Lumpur', 1024, 78);
     });
     const shedFront = new THREE.MeshStandardMaterial({ map: shedSign, roughness: 0.6 });
     const shedSide = new THREE.MeshStandardMaterial({ color: '#d7dce2', roughness: 0.7 });
@@ -452,9 +469,9 @@ export class Airports {
     shed.receiveShadow = true;
     g.add(shed);
 
-    // Terminal complex with a vaulted roof.
+    // Main terminal under KLIA's forest of square, umbrella-like roof shells.
     const T = L.terminal;
-    const glass = new THREE.MeshStandardMaterial({ map: facadeTexture('SINGAPORE CHANGI AIRPORT', 'Welcome to Singapore · 欢迎来到新加坡 · Selamat Datang · வருக'), roughness: 0.2, metalness: 0.3 });
+    const glass = new THREE.MeshStandardMaterial({ map: facadeTexture('KUALA LUMPUR INTERNATIONAL AIRPORT', 'Lapangan Terbang Antarabangsa Kuala Lumpur · Jumpa lagi'), roughness: 0.2, metalness: 0.3 });
     const plain = new THREE.MeshStandardMaterial({ color: '#e6e8ea', roughness: 0.6 });
     const term = new THREE.Mesh(new THREE.BoxGeometry(T.v1 - T.v0, 24, T.u1 - T.u0), [plain, glass, plain, plain, plain, plain]);
     const tp = f.toWorld((T.u0 + T.u1) / 2, (T.v0 + T.v1) / 2);
@@ -462,12 +479,27 @@ export class Airports {
     term.rotation.y = (-f.heading * Math.PI) / 180;
     term.castShadow = true;
     g.add(term);
-    const roof = vaultRoof(T.u1 - T.u0 + 40, T.v1 - T.v0 + 40, 14, new THREE.MeshStandardMaterial({ color: '#cfd6de', metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide }));
-    roof.position.set(tp.x, 24, tp.z);
-    roof.rotation.y = (-f.heading * Math.PI) / 180;
-    g.add(roof);
+    const shellMat = new THREE.MeshStandardMaterial({ color: '#d9dde1', metalness: 0.5, roughness: 0.35, side: THREE.DoubleSide, flatShading: true });
+    const shellGeo = new THREE.ConeGeometry(52, 10, 4, 1, true);
+    shellGeo.rotateX(Math.PI);
+    shellGeo.rotateY(Math.PI / 4);
+    const nu = Math.floor((T.u1 - T.u0) / 74);
+    const nv = Math.floor((T.v1 - T.v0) / 74);
+    const shells = new THREE.InstancedMesh(shellGeo, shellMat, nu * nv);
+    const sm = new THREE.Matrix4();
+    const sq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (-f.heading * Math.PI) / 180);
+    let si = 0;
+    for (let i = 0; i < nu; i++) {
+      for (let j = 0; j < nv; j++) {
+        const w = f.toWorld(T.u0 + 37 + i * 74, T.v0 + 37 + j * 74);
+        sm.compose(new THREE.Vector3(w.x, 29, w.z), sq, new THREE.Vector3(1, 1, 1));
+        shells.setMatrixAt(si++, sm);
+      }
+    }
+    shells.castShadow = true;
+    g.add(shells);
 
-    // Changi's tall control tower.
+    // KLIA's tall, torch-like control tower.
     const tw = new THREE.Group();
     const towerMat = new THREE.MeshStandardMaterial({ color: '#eef0f2', roughness: 0.5 });
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(4, 6, 72, 16), towerMat);
@@ -509,7 +541,7 @@ export class Airports {
     tcab.position.set(0, 1.9, -5.9);
     truck.add(body, tcab);
     truck.traverse((o) => (o.castShadow = true));
-    const trp = f.toWorld(L.cargoStand.u + 26, L.cargoStand.v + 40);
+    const trp = f.toWorld(L.stand.u + 26, L.stand.v + 40);
     truck.position.set(trp.x, 0, trp.z);
     truck.rotation.y = (-f.heading * Math.PI) / 180;
     g.add(truck);
@@ -540,7 +572,7 @@ export class Airports {
   }
 }
 
-/** A simple twin-jet for the gates at Changi. */
+/** A simple twin-jet for the gates at KLIA. */
 function genericJet(f: Frame, u: number, v: number): THREE.Group {
   const g = new THREE.Group();
   const white = new THREE.MeshStandardMaterial({ color: '#f2f3f5', roughness: 0.35 });

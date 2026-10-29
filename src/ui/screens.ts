@@ -46,7 +46,7 @@ export class Screens {
 
   showResults(sum: Summary, best: number, newBest: boolean, crashReason: string, complaint: string | null): void {
     this.results.classList.remove('hidden');
-    $('res-eyebrow').textContent = sum.crashed ? 'Flight not completed' : `Arrived · Singapore Changi · comfort ${sum.comfort}%`;
+    $('res-eyebrow').textContent = sum.crashed ? 'Flight not completed' : `Welcome home · Kuching · comfort ${sum.comfort}%`;
     $('res-stars').textContent = '★'.repeat(sum.stars) + '☆'.repeat(5 - sum.stars);
     $('res-rank').textContent = sum.crashed ? crashReason : sum.rank;
     $('res-score').textContent = `${sum.score.toLocaleString()} pts`;
@@ -69,7 +69,7 @@ export class Screens {
     const note = sum.crashed
       ? 'Keep the aircraft on the dotted line and above the terrain. Small, gentle inputs keep everyone safe and happy.'
       : `${sum.happy} of ${sum.passengers} passengers had a lovely flight` +
-        (sum.sickBags ? ` · ${sum.sickBags} needed a sick bag 🤮` : ' · nobody needed a sick bag 🎉') +
+        (sum.sickBags ? ` · ${sum.sickBags} needed a sick bag` : ' · nobody needed a sick bag') +
         (sum.landing ? `. Touchdown at ${Math.round(sum.landing.fpm)} fpm (${sum.landing.grade}).` : '.') +
         (complaint ? ` Biggest complaint: ${complaint.toLowerCase()}.` : ' Not a single complaint!');
     $('res-note').textContent = note;

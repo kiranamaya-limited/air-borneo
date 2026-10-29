@@ -11,6 +11,9 @@ import type { Reaction } from '../game/comfort';
 import { LoungeMusic } from './music';
 import { PassengerVoices } from './passengers';
 
+/** Lounge music level: the main thing you hear, above the engines. */
+const MUSIC_LEVEL = 0.5;
+
 export class GameAudio {
   private ctx?: AudioContext;
   private master!: GainNode;
@@ -61,7 +64,14 @@ export class GameAudio {
     this.ctx = ctx;
     this.master = ctx.createGain();
     this.master.gain.value = 0.6;
-    this.master.connect(ctx.destination);
+    // A gentle limiter so the louder music, thunder and screams never clip.
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 8;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.25;
+    this.master.connect(limiter).connect(ctx.destination);
 
     const len = ctx.sampleRate * 2;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -145,14 +155,14 @@ export class GameAudio {
     if (!ctx) return;
     const t = ctx.currentTime;
     const k = 0.15;
-    // The engines sit under the music: present, not dominant.
+    // The engines sit well under the music: a soft hum, not a roar.
     const blade = 38 + s.prop * 78;
     this.propOsc.frequency.setTargetAtTime(blade, t, k);
     this.propOsc2.frequency.setTargetAtTime(blade * 2.01, t, k);
-    this.propGain.gain.setTargetAtTime(this.muted ? 0 : 0.03 + s.prop * 0.08, t, k);
+    this.propGain.gain.setTargetAtTime(this.muted ? 0 : 0.012 + s.prop * 0.03, t, k);
     this.whine.frequency.setTargetAtTime(1500 + s.prop * 1600, t, k);
-    this.whineGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.007, t, k);
-    this.washGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.07, t, k);
+    this.whineGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.0025, t, k);
+    this.washGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.028, t, k);
     // Wind swells with gusts and rough air.
     this.gustPhase += dt * (0.6 + s.turb * 2.5);
     const swell = 1 + s.gust * 0.9 * (0.5 + 0.5 * Math.sin(this.gustPhase)) + s.turb * 0.6 * Math.abs(Math.sin(this.gustPhase * 2.3));
@@ -160,7 +170,7 @@ export class GameAudio {
     this.windGain.gain.setTargetAtTime(this.muted ? 0 : Math.min(0.32, (s.speed / 1100) * swell), t, k);
     this.rainGain.gain.setTargetAtTime(this.muted ? 0 : s.rain * 0.2, t, 0.4);
     this.music?.setStorm(Math.max(s.rain, s.turb > 0.5 ? s.turb - 0.3 : 0));
-    this.music?.out.gain.setTargetAtTime(this.muted ? 0 : 0.22, t, 0.3);
+    this.music?.out.gain.setTargetAtTime(this.muted ? 0 : MUSIC_LEVEL, t, 0.3);
     // A whoosh now and then when it's bumpy.
     if (s.turb > 0.45 && Math.random() < dt * s.turb * 0.9) this.burst(0.9, 'bandpass', 500 + Math.random() * 600, 0.12 * s.turb, 0, 0.8);
 

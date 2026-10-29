@@ -1,0 +1,27 @@
+{
+  "name": "AirBorneo \u00b7 Coming Home",
+  "short_name": "AirBorneo",
+  "description": "Fly 68 passengers home from Kuala Lumpur to Kuching with your phone as the yoke.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
