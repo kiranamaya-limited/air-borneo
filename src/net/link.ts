@@ -181,6 +181,12 @@ export class ControllerLink {
     return !!this.conn?.open;
   }
 
+  /** Close the data channel promptly so the screen pauses straight away. */
+  close(): void {
+    this.conn?.close();
+    this.peer?.destroy();
+  }
+
   send(msg: ControllerMsg): void {
     if (this.conn?.open) void this.conn.send(msg);
   }

@@ -207,7 +207,7 @@ export class Heightfield {
 
     // Flatten the airports exactly to y = 0.
     const flat = Math.max(kchAirport, sgAirport);
-    if (flat > 0) h = h * (1 - flat) - 0.05 * flat;
+    if (flat > 0) h = h * (1 - flat) - 1.4 * flat;
 
     const cityD = Math.hypot(x - this.kuchingCity.x, z - this.kuchingCity.z);
     let urban = region === 'borneo' ? smooth(2600, 800, cityD) : 0;

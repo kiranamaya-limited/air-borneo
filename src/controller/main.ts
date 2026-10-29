@@ -84,20 +84,19 @@ function sensorUpdated(): void {
 
 async function requestSensors(): Promise<boolean> {
   type PermissionCtor = { requestPermission?: () => Promise<'granted' | 'denied'> };
+  // Listen regardless: the permission answer only decides what hint to show if no data arrives.
+  window.addEventListener('deviceorientation', onOrientation);
+  window.addEventListener('devicemotion', onMotion);
+  let granted = true;
   try {
     const ori = DeviceOrientationEvent as unknown as PermissionCtor;
-    if (typeof ori.requestPermission === 'function') {
-      if ((await ori.requestPermission()) !== 'granted') return false;
-    }
-    const mot = (window.DeviceMotionEvent as unknown as PermissionCtor | undefined);
+    if (typeof ori.requestPermission === 'function') granted = (await ori.requestPermission()) === 'granted';
+    const mot = window.DeviceMotionEvent as unknown as PermissionCtor | undefined;
     if (mot && typeof mot.requestPermission === 'function') await mot.requestPermission().catch(() => 'denied');
   } catch (err) {
     console.warn('sensor permission', err);
-    return false;
   }
-  window.addEventListener('deviceorientation', onOrientation);
-  window.addEventListener('devicemotion', onMotion);
-  return true;
+  return granted;
 }
 
 // ---------------------------------------------------------------- comfort: wake lock, fullscreen
@@ -136,6 +135,7 @@ window.addEventListener('resize', updateRotateOverlay);
 // ---------------------------------------------------------------- link
 
 const link = new ControllerLink(onScreenMessage, onLinkStatus);
+window.addEventListener('pagehide', () => link.close());
 let connectedOnce = false;
 
 function onLinkStatus(status: LinkStatus): void {
@@ -301,17 +301,13 @@ $('connect-form').addEventListener('submit', async (e) => {
   void keepAwake();
   void goFullscreen();
   show('calibrate');
-  if (!granted) {
-    sensorHint.textContent = 'Motion access was blocked. Allow motion & orientation for this site, then reload.';
+  window.setTimeout(() => {
+    if (latestUp) return;
+    sensorHint.textContent = granted
+      ? 'No motion sensor data yet. This page must be opened over https on a phone.'
+      : 'Motion access was blocked. Allow motion & orientation for this site, then reload.';
     sensorHint.classList.add('bad');
-  } else {
-    window.setTimeout(() => {
-      if (!latestUp) {
-        sensorHint.textContent = 'No motion sensor data yet. This page must be opened over https on a phone.';
-        sensorHint.classList.add('bad');
-      }
-    }, 2500);
-  }
+  }, 2500);
   link.connect(code);
   const url = new URL(location.href);
   url.searchParams.set('c', code);

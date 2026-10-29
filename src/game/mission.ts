@@ -313,8 +313,8 @@ export class Mission {
     if (s < st['climb:end']) return { speed: 115, stage: 'CLIMB' };
     if (s < st['turnout:end']) return { speed: 150, stage: 'CLIMB' };
     if (s < st['squall']) return { speed: 210, stage: 'CRUISE · FL170' };
-    if (s < st['base']) return { speed: 170, stage: 'DESCENT' };
-    if (s < st['final']) return { speed: 125, stage: 'APPROACH' };
+    if (s < st['base']) return { speed: 150, stage: 'DESCENT' };
+    if (s < st['final']) return { speed: 100, stage: 'APPROACH' };
     return { speed: 85, stage: 'FINAL · RWY 20C' };
   }
 

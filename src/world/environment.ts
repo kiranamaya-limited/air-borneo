@@ -77,21 +77,21 @@ export class Environment {
   }
 
   update(dt: number, focus: THREE.Vector3, camera: THREE.Camera, weather: { rain: number; cloud: number }): void {
-    const target = Math.min(1, Math.max(weather.cloud, weather.rain * 0.7));
+    const target = Math.min(1, Math.max(weather.cloud, weather.rain * 0.95));
     this.storm += (target - this.storm) * Math.min(1, dt * 1.5);
     const s = this.storm;
     this.flash = Math.max(0, this.flash - dt * 4);
     const f = this.flash * (0.6 + 0.4 * Math.sin(this.flash * 40));
 
     this.fog.color.copy(FOG_CLEAR).lerp(FOG_STORM, s).lerp(new THREE.Color('#dfe6ff'), f * 0.6);
-    this.fog.near = THREE.MathUtils.lerp(2500, 90, s);
-    this.fog.far = THREE.MathUtils.lerp(19000, 1900, s);
+    this.fog.near = THREE.MathUtils.lerp(2500, 40, s);
+    this.fog.far = THREE.MathUtils.lerp(19000, 1500, s);
     this.skyColor.copy(SKY_TINT).lerp(FOG_STORM, s);
     (this.stormDome.material as THREE.MeshBasicMaterial).opacity = s * 0.85;
     this.stormDome.position.copy(camera.position);
 
-    this.sun.intensity = 2.3 * (1 - s * 0.75) + f * 3;
-    this.hemi.intensity = 0.85 * (1 - s * 0.35) + f * 2.5;
+    this.sun.intensity = 2.3 * (1 - s * 0.85) + f * 3;
+    this.hemi.intensity = 0.85 * (1 - s * 0.45) + f * 2.5;
 
     this.sun.position.copy(focus).addScaledVector(this.sunDir, 800);
     this.sun.target.position.copy(focus);

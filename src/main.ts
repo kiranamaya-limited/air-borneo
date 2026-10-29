@@ -1,6 +1,5 @@
 import './brand/brand.css';
 import './ui/hud.css';
-import * as THREE from 'three';
 import { Mission, type MissionEvent } from './game/mission';
 import { autopilot } from './game/autopilot';
 import type { FlightInput } from './game/flight';
@@ -235,7 +234,7 @@ async function boot(): Promise<void> {
 
   // ------------------------------------------------------------------ loop
 
-  const clock = new THREE.Clock();
+  let last = performance.now();
   let time = 0;
   let input: FlightInput = { roll: 0, pitch: 0, throttle: 0 };
   screens.showTitle(true, readBest());
@@ -247,7 +246,9 @@ async function boot(): Promise<void> {
   let fpsChecked = false;
 
   function frame(): void {
-    const realDt = clock.getDelta();
+    const now = performance.now();
+    const realDt = (now - last) / 1000;
+    last = now;
     const dt = Math.min(realDt, 0.05);
     time += dt;
     if (!fpsChecked && mission.phase !== 'pairing') {
@@ -269,7 +270,8 @@ async function boot(): Promise<void> {
       if (mission.want === 'flaps' && mission.phase === 'flight') mission.flapsPress();
     }
 
-    const paused = mode === 'phone' && !link.connected && ACTIVE.includes(mission.phase);
+    // Pause if the phone drops out or goes quiet (locked, backgrounded, out of range).
+    const paused = mode === 'phone' && ACTIVE.includes(mission.phase) && (!link.connected || performance.now() - phone.at > 2500);
     screens.showPaused(paused);
     if (!paused) for (let i = 0; i < timescale; i++) mission.update(dt, input);
     for (const e of mission.drain()) handle(e);
@@ -283,7 +285,7 @@ async function boot(): Promise<void> {
       rain: ['flight', 'flare'].includes(mission.phase) ? mission.wx.rain : 0,
       warning: mission.alert?.level === 'warning',
     });
-    soundBtn.classList.toggle('hidden', audio.unlocked || mission.phase === 'pairing');
+    soundBtn.classList.toggle('hidden', audio.unlocked || ['pairing', 'results', 'crashed'].includes(mission.phase));
     sendState();
     world.render();
     requestAnimationFrame(frame);

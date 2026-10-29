@@ -10,7 +10,14 @@ import { CHANGI_LAYOUT, KCH_LAYOUT, kchFrame, type Frame } from '../game/layout'
 import { AircraftModel } from './aircraft';
 import type { Aircraft } from '../game/flight';
 
-const Y = 0.04;
+/**
+ * Surface heights. The logarithmic depth buffer ignores polygon offset, so layers are separated
+ * physically: grass < taxiways/aprons < runway < paint. The aircraft rolls on y = 0.
+ */
+const Y = -0.12;
+const GRASS_Y = -0.9;
+const PAVEMENT_Y = -0.6;
+const RUNWAY_Y = -0.35;
 
 interface Rect {
   u: number;
@@ -108,7 +115,7 @@ function buildRunway(spec: RunwaySpec, asphalt: THREE.Texture): { group: THREE.G
   const surfTex = asphalt.clone();
   surfTex.needsUpdate = true;
   surfTex.repeat.set(width / 20, len / 20);
-  const surface = quads(frame, [{ u: (u0 + u1) / 2, v: 0, lu: len + 60, lv: width + 4 }], '#ffffff', 0.01);
+  const surface = quads(frame, [{ u: (u0 + u1) / 2, v: 0, lu: len + 60, lv: width + 4 }], '#ffffff', RUNWAY_Y);
   (surface.material as THREE.MeshStandardMaterial).map = surfTex;
   (surface.material as THREE.MeshStandardMaterial).roughness = 0.92;
   g.add(surface);
@@ -256,7 +263,7 @@ export class Airports {
     const L = KCH_LAYOUT;
     const g = new THREE.Group();
     g.name = 'WBGG';
-    g.add(quads(f, [{ u: 0, v: 150, lu: 5000, lv: 1500 }], '#6f9a4f', -0.02));
+    g.add(quads(f, [{ u: 0, v: 150, lu: 5000, lv: 1500 }], '#6f9a4f', GRASS_Y));
     const rwy = buildRunway({ frame: f, u0: -L.halfLength, u1: L.halfLength, width: L.width, names: ['25', '07'] }, asphalt);
     g.add(rwy.group);
 
@@ -269,8 +276,8 @@ export class Airports {
       { u: 700, v: 95, lu: 26, lv: 190 },
       { u: 1300, v: 95, lu: 26, lv: 190 },
     ];
-    g.add(quads(f, taxi, '#45494f', 0.012));
-    g.add(quads(f, [{ u: (L.apron.u0 + L.apron.u1) / 2, v: (L.apron.v0 + L.apron.v1) / 2, lu: L.apron.u1 - L.apron.u0, lv: L.apron.v1 - L.apron.v0 }], '#a3a6a8', 0.014));
+    g.add(quads(f, taxi, '#45494f', PAVEMENT_Y));
+    g.add(quads(f, [{ u: (L.apron.u0 + L.apron.u1) / 2, v: (L.apron.v0 + L.apron.v1) / 2, lu: L.apron.u1 - L.apron.u0, lv: L.apron.v1 - L.apron.v0 }], '#a3a6a8', PAVEMENT_Y + 0.05));
     const yellow: Rect[] = [{ u: -300, v: L.taxiwayV, lu: 3300, lv: 0.5 }];
     for (let u = L.apron.u0 + 100; u < L.apron.u1; u += 100) yellow.push({ u, v: 290, lu: 0.5, lv: 110 });
     g.add(quads(f, yellow, brand.colors.yellow, Y));
@@ -366,7 +373,7 @@ export class Airports {
     const L = CHANGI_LAYOUT;
     const g = new THREE.Group();
     g.name = 'WSSS';
-    g.add(quads(f, [{ u: 1800, v: 250, lu: 6000, lv: 1500 }], '#73a052', -0.02));
+    g.add(quads(f, [{ u: 1800, v: 250, lu: 6000, lv: 1500 }], '#73a052', GRASS_Y));
     const rwy = buildRunway({ frame: f, u0: 0, u1: L.length, width: L.width, names: ['20C', '02C'] }, asphalt);
     g.add(rwy.group);
     this.papi = rwy.papi;
@@ -416,9 +423,9 @@ export class Airports {
       { u: 3950, v: 105, lu: 30, lv: 210 },
       { u: L.cargoStand.u, v: 245, lu: 30, lv: 60 },
     ];
-    g.add(quads(f, taxi, '#45494f', 0.012));
+    g.add(quads(f, taxi, '#45494f', PAVEMENT_Y));
     const A = L.cargoApron;
-    g.add(quads(f, [{ u: (A.u0 + A.u1) / 2, v: (A.v0 + A.v1) / 2, lu: A.u1 - A.u0, lv: A.v1 - A.v0 }], '#a5a8aa', 0.014));
+    g.add(quads(f, [{ u: (A.u0 + A.u1) / 2, v: (A.v0 + A.v1) / 2, lu: A.u1 - A.u0, lv: A.v1 - A.v0 }], '#a5a8aa', PAVEMENT_Y + 0.05));
     const yellow: Rect[] = [{ u: 2000, v: L.taxiwayV, lu: 4300, lv: 0.5 }];
     for (let u = A.u0 + 100; u < A.u1; u += 100) yellow.push({ u, v: 360, lu: 0.5, lv: 160 });
     g.add(quads(f, yellow, brand.colors.yellow, Y));

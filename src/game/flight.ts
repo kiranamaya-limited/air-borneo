@@ -193,7 +193,7 @@ export class Aircraft {
     // Autothrottle (idle in the flare).
     const flaring = ctx.landing && agl < FLARE.zone;
     const spdTarget = flaring ? 0 : ctx.targetSpeed;
-    const accel = spdTarget > this.speed ? 5 : flaring ? -FLARE.decel : -6;
+    const accel = spdTarget > this.speed ? 5 : flaring ? -FLARE.decel : -9;
     this.speed += Math.sign(spdTarget - this.speed) * Math.min(Math.abs(spdTarget - this.speed), Math.abs(accel) * dt);
 
     const d = dirFromHeading(this.heading);
@@ -279,8 +279,8 @@ export function altitudeFt(y: number): number {
   ]);
 }
 
-/** Displayed vertical speed in ft/min. Real scale near the ground, exaggerated in the climb. */
+/** Displayed vertical speed in ft/min: real near the ground, scaled to airliner-like rates above. */
 export function verticalSpeedFpm(vs: number, y: number): number {
-  const scale = y < 60 ? 1 : Math.min(8, (altitudeFt(y + 1) - altitudeFt(y)) / 3.281);
-  return Math.round((vs * 196.85 * scale) / 10) * 10;
+  const fpm = vs * 196.85 * (y < 60 ? 1 : 0.55);
+  return Math.round(Math.max(-3500, Math.min(3500, fpm)) / 10) * 10;
 }

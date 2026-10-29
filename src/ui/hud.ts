@@ -36,6 +36,8 @@ export class Hud {
   private readonly altTape = $<HTMLCanvasElement>('alt-tape');
   private readonly hdgTape = $<HTMLCanvasElement>('heading-tape');
   private calloutTimer = 0;
+  private popupTimer = 0;
+  private pending: { grade: Grade; points: number } | null = null;
   private lastMult = 1;
 
   constructor(mission: Mission) {
@@ -64,14 +66,25 @@ export class Hud {
     this.root.classList.toggle('hidden', !visible);
   }
 
+  /** Marker pop-ups, merged so a burst of markers at cruise speed reads as one. */
   popup(grade: Grade, points: number): void {
-    if (grade === 'MISS' && Math.random() < 0.6) return;
-    const el = document.createElement('div');
-    el.className = `popup ${grade}`;
-    el.textContent = grade === 'MISS' ? 'MISS' : `${grade} +${points}`;
-    el.style.marginLeft = `${(Math.random() - 0.5) * 60}px`;
-    this.popups.appendChild(el);
-    window.setTimeout(() => el.remove(), 950);
+    const rank: Record<Grade, number> = { PERFECT: 3, GOOD: 2, OK: 1, MISS: 0 };
+    if (this.pending && rank[grade] > rank[this.pending.grade]) this.pending.grade = grade;
+    if (this.pending) this.pending.points += points;
+    else this.pending = { grade, points };
+    if (this.popupTimer) return;
+    this.popupTimer = window.setTimeout(() => {
+      const p = this.pending!;
+      this.pending = null;
+      this.popupTimer = 0;
+      if (p.grade === 'MISS') return;
+      const el = document.createElement('div');
+      el.className = `popup ${p.grade}`;
+      el.textContent = `${p.grade} +${p.points}`;
+      el.style.marginLeft = `${(Math.random() - 0.5) * 60}px`;
+      this.popups.appendChild(el);
+      window.setTimeout(() => el.remove(), 950);
+    }, 350);
   }
 
   showCallout(text: string): void {

@@ -17,7 +17,15 @@ const BASE = `https://localhost:${PORT}`;
 const SHOTS = 'e2e-shots';
 mkdirSync(SHOTS, { recursive: true });
 
-const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+const stopServer = () => {
+  try {
+    process.kill(-server.pid, 'SIGTERM');
+  } catch {
+    /* already gone */
+  }
+};
+process.on('exit', stopServer);
 await new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error('vite did not start')), 60000);
   server.stdout.on('data', (d) => {
@@ -50,6 +58,7 @@ try {
   await screen.screenshot({ path: `${SHOTS}/01-title.png` });
 
   const phoneCtx = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true, deviceScaleFactor: 2 });
+  await phoneCtx.grantPermissions(['accelerometer', 'gyroscope', 'magnetometer']).catch(() => undefined);
   const openPhone = async () => {
     const phone = await phoneCtx.newPage();
     phone.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
@@ -140,7 +149,7 @@ try {
   await phone.screenshot({ path: `${SHOTS}/08-phone-result.png` });
 } finally {
   await browser.close();
-  server.kill();
+  stopServer();
 }
 
 const realErrors = errors.filter((e) => !/favicon|WebGL|GPU stall|peer error/i.test(e));
