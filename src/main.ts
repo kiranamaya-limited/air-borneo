@@ -8,7 +8,7 @@ import { World } from './world/world';
 import { Hud } from './ui/hud';
 import { Screens } from './ui/screens';
 import { GameAudio } from './audio/audio';
-import { createScreenLink, type LinkStatus } from './net/link';
+import { createScreenLink, describeLink, type LinkStatus } from './net/link';
 import { makeCode, normaliseCode, type ControllerMsg, type Phase } from './net/protocol';
 
 const params = new URLSearchParams(location.search);
@@ -76,6 +76,13 @@ async function boot(): Promise<void> {
   const port = location.port ? `:${location.port}` : '';
   const pairUrl = (c: string) => `${location.protocol}//${host}${port}/controller.html?c=${c}`;
   link.start(code);
+  // Live connection panel on the pairing card: names the first thing that's wrong.
+  const pairDiag = document.getElementById('pair-diag')!;
+  window.setInterval(() => {
+    const d = describeLink(link.diagnostics(), 'phone');
+    if (pairDiag.textContent !== d.text) pairDiag.textContent = d.text;
+    pairDiag.classList.toggle('bad', d.bad);
+  }, 1000);
 
   function onLinkStatus(status: LinkStatus, c: string): void {
     void screens.setPairing(c.toUpperCase(), pairUrl(c.toUpperCase()));
@@ -344,6 +351,9 @@ async function boot(): Promise<void> {
     },
     get paused() {
       return !document.getElementById('paused')!.classList.contains('hidden');
+    },
+    get linkConnected() {
+      return link.connected;
     },
     set autoFly(v: boolean) {
       autoFly = v;

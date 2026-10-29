@@ -20,17 +20,19 @@ export type ScreenMsg =
 /** Which phone control the game is currently asking for, so the phone can highlight it. */
 export type Want = 'none' | 'flaps' | 'throttle-up' | 'throttle-idle' | 'pitch-up' | 'steer' | 'action';
 
-export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+/** Pairing codes are six digits: quick to read off a screen and to type on a phone's number pad. */
+export const CODE_ALPHABET = '0123456789';
+export const CODE_LENGTH = 6;
 export const PEER_PREFIX = 'airborneo-fcr-';
 
-export function makeCode(length = 5, rand: () => number = Math.random): string {
+export function makeCode(length = CODE_LENGTH, rand: () => number = Math.random): string {
   let out = '';
   for (let i = 0; i < length; i++) out += CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)];
   return out;
 }
 
 export function normaliseCode(raw: string): string {
-  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  return raw.replace(/\D/g, '').slice(0, CODE_LENGTH);
 }
 
 export function peerIdFor(code: string): string {

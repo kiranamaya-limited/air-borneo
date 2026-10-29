@@ -55,7 +55,7 @@ try {
   await screen.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await screen.waitForFunction(() => document.querySelector('#pair-status')?.textContent?.includes('Waiting'), null, { timeout: 30000 });
   const code = await screen.evaluate(() => window.__game.code.toUpperCase());
-  check(/^[A-Z0-9]{5}$/.test(code), `screen shows a pairing code (${code})`);
+  check(/^[0-9]{6}$/.test(code), `screen shows a 6-digit pairing code (${code})`);
   await screen.waitForTimeout(1500);
   const sound = await screen.evaluate(() => window.__game.audio);
   check(sound.context === 'running' && sound.music, `lounge music plays without a click (${JSON.stringify(sound)})`);
@@ -140,15 +140,31 @@ try {
   await phone.waitForSelector('#calibrate-btn:not([disabled])');
   await phone.click('#calibrate-btn');
 
+  // The phone's network drops, then comes back: the link recovers by itself (autopilot flies meanwhile).
+  await screen.evaluate(() => { window.__game.autoFly = true; });
+  await phoneCtx.setOffline(true);
+  await phone.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await phone.waitForTimeout(3000);
+  const offlineSeen = await phone.evaluate(() => !navigator.onLine);
+  await phoneCtx.setOffline(false);
+  await phone.evaluate(() => window.dispatchEvent(new Event('online')));
+  await screen.waitForFunction(() => window.__game.linkConnected && !window.__game.paused, null, { timeout: 60000 });
+  await screen.evaluate(() => { window.__game.autoFly = false; });
+  check(true, `link recovers after the phone's network drops (phone saw offline: ${offlineSeen})`);
+  const diag = await screen.evaluate(() => document.getElementById('pair-diag').textContent);
+  check(/linked/.test(diag), `screen's connection panel reports the link (${diag})`);
+
   // Fly the rest by autopilot in fast-forward, with stills along the way.
-  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['city'] + 500));
-  await screen.screenshot({ path: `${SHOTS}/06-kuching.png` });
-  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['islands-2'] + 300));
-  await screen.screenshot({ path: `${SHOTS}/06-islands.png` });
+  await screen.evaluate(() => { window.__game.autoFly = true; });
+  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['kl'] + 300));
+  await screen.screenshot({ path: `${SHOTS}/06-kl.png` });
   await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['storm'] + 500));
   await screen.screenshot({ path: `${SHOTS}/06-storm.png` });
+  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['sarawak'] + 300));
+  await screen.screenshot({ path: `${SHOTS}/06-sarawak.png` });
   const phase = await screen.evaluate(() => window.__game.fastForward(200, (m) => m.phase === 'results' || m.phase === 'crashed'));
-  check(phase === 'results', `mission reaches results (${phase})`);
+  const why = await screen.evaluate(() => { const m = window.__game.mission; return `${m.crashReason} at s=${Math.round(m.track.s)} (${Object.entries(m.route.stations).filter(([k, v]) => !k.includes(':') && v <= m.track.s).pop()?.[0]})`; });
+  check(phase === 'results', `mission reaches results (${phase}${phase === 'crashed' ? ': ' + why : ''})`);
   await screen.waitForSelector('#results:not(.hidden)', { timeout: 30000 });
   await screen.screenshot({ path: `${SHOTS}/07-results.png` });
   const stars = await screen.textContent('#res-stars');

@@ -237,3 +237,7 @@ body.game {
 }
 .sound-hint svg { width: 16px; height: 16px; }
 .sound-hint.hidden { opacity: 0; }
+
+/* ------------------------------------------------------------------ connection panel */
+.diag { font-size: 11px; line-height: 1.35; color: var(--ab-slate); text-align: center; max-width: 260px; min-height: 1.35em; }
+.diag.bad { color: var(--ab-red); }

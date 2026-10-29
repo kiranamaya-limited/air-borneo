@@ -23,8 +23,9 @@ export class Screens {
   }
 
   async setPairing(code: string, url: string): Promise<void> {
-    $('pair-code').textContent = code;
-    $('pause-code').textContent = code;
+    const shown = code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+    $('pair-code').textContent = shown;
+    $('pause-code').textContent = shown;
     $('pair-url').textContent = url.replace(/^https?:\/\//, '');
     const opts = { margin: 1, color: { dark: brand.colors.ink, light: '#ffffff' } };
     await QRCode.toCanvas($<HTMLCanvasElement>('qr'), url, { ...opts, width: 230 });

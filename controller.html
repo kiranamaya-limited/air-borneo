@@ -18,12 +18,13 @@
         </div>
         <span class="ab-stripe"></span>
         <h1>Your phone is the yoke. Fly them there smoothly.</h1>
-        <p class="lead">Enter the code shown on the big screen.</p>
+        <p class="lead">Enter the 6-digit code shown on the big screen.</p>
         <form id="connect-form" autocomplete="off">
-          <input id="code" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="8" placeholder="CODE" aria-label="Pairing code" />
+          <input id="code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" spellcheck="false" maxlength="7" placeholder="6-digit code" aria-label="Pairing code" />
           <button class="ab-btn" type="submit" id="connect-btn">Connect</button>
         </form>
         <p class="hint" id="connect-hint">Motion sensors and screen wake-lock will be requested.</p>
+        <p class="diag mono" id="link-diag-connect"></p>
       </section>
 
       <!-- Step 2: calibrate -->
@@ -45,6 +46,7 @@
             <h2>Hold it like a control yoke</h2>
             <p>Landscape, both hands, screen facing you and tilted back a little. Then tap <b>Calibrate</b>.</p>
             <p class="hint" id="sensor-hint">Waiting for motion sensors…</p>
+            <p class="diag mono" id="link-diag"></p>
             <button class="ab-btn" id="calibrate-btn" disabled>Calibrate</button>
           </div>
         </div>

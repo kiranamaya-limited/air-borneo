@@ -1,6 +1,6 @@
 import '../brand/brand.css';
 import './controller.css';
-import { createPhoneLink, type LinkStatus } from '../net/link';
+import { createPhoneLink, describeLink, type LinkStatus } from '../net/link';
 import { normaliseCode, type FlapSetting, type ScreenMsg, type Want } from '../net/protocol';
 import { calibrate, readTilt, shapeAxis, Smoother, upFromBetaGamma, upFromGravity, type Calibration, type Vec3 } from './tilt';
 
@@ -137,6 +137,15 @@ window.addEventListener('resize', updateRotateOverlay);
 
 const link = createPhoneLink(onScreenMessage, onLinkStatus);
 window.addEventListener('pagehide', () => link.close());
+const diagEls = [$('link-diag'), $('link-diag-connect')];
+window.setInterval(() => {
+  if (!link.status || step === 'fly') return;
+  const d = describeLink(link.diagnostics(), 'screen');
+  for (const el of diagEls) {
+    if (el.textContent !== d.text) el.textContent = d.text;
+    el.classList.toggle('bad', d.bad);
+  }
+}, 1000);
 let connectedOnce = false;
 
 function onLinkStatus(status: LinkStatus): void {
@@ -291,8 +300,8 @@ $('recal-btn').addEventListener('click', doCalibrate);
 $('connect-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const code = normaliseCode(codeInput.value);
-  if (code.length < 4) {
-    connectHint.textContent = 'The code has 5 letters and numbers.';
+  if (code.length !== 6) {
+    connectHint.textContent = 'The code has 6 digits.';
     connectHint.classList.add('bad');
     return;
   }
