@@ -1,0 +1,75 @@
+/** Title (pairing), results and pause screens. */
+import QRCode from 'qrcode';
+import { brand } from '../brand/tokens';
+import type { Summary } from '../game/scoring';
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+export class Screens {
+  private readonly title = $('title');
+  private readonly results = $('results');
+  private readonly paused = $('paused');
+  private readonly loading = $('loading');
+  private readonly status = $('pair-status');
+
+  hideLoading(): void {
+    this.loading.classList.add('done');
+    window.setTimeout(() => this.loading.remove(), 700);
+  }
+
+  showTitle(visible: boolean, best = 0): void {
+    this.title.classList.toggle('hidden', !visible);
+    $('title-best').textContent = best > 0 ? `Your best: ${best.toLocaleString()} pts` : '';
+  }
+
+  async setPairing(code: string, url: string): Promise<void> {
+    $('pair-code').textContent = code;
+    $('pause-code').textContent = code;
+    $('pair-url').textContent = url.replace(/^https?:\/\//, '');
+    const opts = { margin: 1, color: { dark: brand.colors.ink, light: '#ffffff' } };
+    await QRCode.toCanvas($<HTMLCanvasElement>('qr'), url, { ...opts, width: 230 });
+    await QRCode.toCanvas($<HTMLCanvasElement>('qr-paused'), url, { ...opts, width: 180 });
+  }
+
+  pairStatus(text: string, cls: 'ok' | 'warn' | 'bad'): void {
+    this.status.className = `ab-chip ${cls}`;
+    (this.status.querySelector('span:last-child') as HTMLElement).textContent = text;
+  }
+
+  showPaused(visible: boolean): void {
+    this.paused.classList.toggle('hidden', !visible);
+  }
+
+  hideResults(): void {
+    this.results.classList.add('hidden');
+  }
+
+  showResults(sum: Summary, best: number, newBest: boolean, crashReason: string): void {
+    this.results.classList.remove('hidden');
+    $('res-eyebrow').textContent = sum.crashed ? 'Mission failed' : 'Arrived · Singapore Changi';
+    $('res-stars').textContent = '★'.repeat(sum.stars) + '☆'.repeat(5 - sum.stars);
+    $('res-rank').textContent = sum.crashed ? crashReason : sum.rank;
+    $('res-score').textContent = `${sum.score.toLocaleString()} pts`;
+    const bestEl = $('res-best');
+    bestEl.textContent = newBest ? 'New personal best!' : `Personal best ${best.toLocaleString()} pts`;
+    bestEl.classList.toggle('new', newBest);
+    const table = $('res-lines');
+    table.innerHTML = '';
+    for (const line of sum.lines) {
+      const tr = document.createElement('tr');
+      const cells = [line.label, line.value, `${line.points > 0 ? '+' : ''}${line.points.toLocaleString()}`];
+      cells.forEach((text, i) => {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (i === 2 && line.points < 0) td.className = 'neg';
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    }
+    const note = sum.crashed
+      ? 'Keep the aircraft on the dotted line and above the terrain. Tilt gently: small inputs win.'
+      : `${sum.perfect} perfect, ${sum.good} good, ${sum.ok} ok, ${sum.miss} missed of ${sum.markers} markers · average ${sum.avgDeviation.toFixed(1)} m off the line · best combo ${sum.bestCombo}.` +
+        (sum.landing ? ` Touchdown at ${Math.round(sum.landing.fpm)} fpm (${sum.landing.grade}).` : '');
+    $('res-note').textContent = note;
+  }
+}

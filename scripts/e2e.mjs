@@ -1,0 +1,152 @@
+/**
+ * End-to-end test: a big screen and a phone in one headless Chromium.
+ *
+ * Starts the Vite dev server (with its local PeerJS signalling server), pairs a phone-sized page
+ * over real WebRTC, drives it with synthetic deviceorientation events and taps, and checks that
+ * the flaps, throttle, tilt, pause-on-disconnect and results all reach the game. The cruise is
+ * fast-forwarded (software WebGL is slow here). Screenshots go to ./e2e-shots.
+ *
+ *   npm run e2e            (first time: npx playwright install chromium)
+ */
+import { spawn } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
+import { chromium } from 'playwright';
+
+const PORT = 5180;
+const BASE = `https://localhost:${PORT}`;
+const SHOTS = 'e2e-shots';
+mkdirSync(SHOTS, { recursive: true });
+
+const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] });
+await new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('vite did not start')), 60000);
+  server.stdout.on('data', (d) => {
+    if (String(d).includes('Local')) {
+      clearTimeout(timer);
+      resolve();
+    }
+  });
+  server.on('exit', (code) => reject(new Error(`vite exited ${code}`)));
+});
+
+const errors = [];
+const failures = [];
+function check(cond, label) {
+  console.log(`${cond ? '✓' : '✗'} ${label}`);
+  if (!cond) failures.push(label);
+}
+
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+try {
+  const screenCtx = await browser.newContext({ viewport: { width: 960, height: 540 }, ignoreHTTPSErrors: true });
+  const screen = await screenCtx.newPage();
+  screen.on('pageerror', (e) => errors.push(`screen: ${e.message}`));
+  screen.on('console', (m) => m.type() === 'error' && errors.push(`screen console: ${m.text()}`));
+  await screen.goto(`${BASE}/?seed=7&quality=low&timescale=6`);
+  await screen.waitForFunction(() => window.__game, null, { timeout: 120000 });
+  await screen.waitForFunction(() => document.querySelector('#pair-status')?.textContent?.includes('Waiting'), null, { timeout: 30000 });
+  const code = await screen.evaluate(() => window.__game.code.toUpperCase());
+  check(/^[A-Z0-9]{5}$/.test(code), `screen shows a pairing code (${code})`);
+  await screen.screenshot({ path: `${SHOTS}/01-title.png` });
+
+  const phoneCtx = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true, deviceScaleFactor: 2 });
+  const openPhone = async () => {
+    const phone = await phoneCtx.newPage();
+    phone.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
+    await phone.goto(`${BASE}/controller.html?c=${code}`);
+    // Synthetic yoke: landscape, tilted back 45°, then roll/pitch relative to that (see tests/tilt.test.ts).
+    await phone.evaluate(() => {
+      const DEG = Math.PI / 180;
+      window.__tilt = (roll = 0, pitch = 0) => {
+        const e = (45 + pitch) * DEG;
+        const r = roll * DEG;
+        const u = { x: Math.cos(r) * Math.cos(e), y: Math.sin(r), z: Math.cos(r) * Math.sin(e) };
+        let beta = Math.asin(u.y) / DEG;
+        let gamma = Math.atan2(-u.x, u.z) / DEG;
+        if (gamma >= 90 || gamma < -90) {
+          gamma = gamma >= 90 ? gamma - 180 : gamma + 180;
+          beta = beta >= 0 ? 180 - beta : -180 - beta;
+        }
+        window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta, gamma }));
+      };
+      window.__tiltTimer = setInterval(() => window.__tilt(window.__roll ?? 0, window.__pitch ?? 0), 50);
+    });
+    return phone;
+  };
+  const setTilt = (page, roll, pitch) => page.evaluate(([r, p]) => { window.__roll = r; window.__pitch = p; }, [roll, pitch]);
+
+  let phone = await openPhone();
+  await phone.click('#connect-btn');
+  await phone.waitForSelector('#calibrate-btn:not([disabled])', { timeout: 30000 });
+  await phone.waitForFunction(() => window.__yoke.state.connected, null, { timeout: 30000 });
+  check(true, 'phone connected to the screen over WebRTC');
+  await phone.screenshot({ path: `${SHOTS}/02-phone-calibrate.png` });
+  await phone.click('#calibrate-btn');
+  await screen.waitForFunction(() => window.__game.mission.phase === 'intro', null, { timeout: 30000 });
+  check(true, 'calibrating starts the mission (intro)');
+
+  await phone.click('#action-btn');
+  await screen.waitForFunction(() => window.__game.mission.phase === 'lineup', null, { timeout: 30000 });
+  check(true, 'phone Action skips the intro to line-up');
+  await phone.click('#flaps-btn');
+  await screen.waitForFunction(() => window.__game.mission.ac.flaps === 15, null, { timeout: 15000 });
+  check(true, 'phone FLAPS button sets flaps 15');
+
+  // Throttle lever: drag from bottom to top.
+  const track = await phone.locator('#lever-track').boundingBox();
+  await phone.mouse.move(track.x + track.width / 2, track.y + track.height - 10);
+  await phone.mouse.down();
+  await phone.mouse.move(track.x + track.width / 2, track.y + 5, { steps: 8 });
+  await phone.mouse.up();
+  await screen.waitForFunction(() => window.__game.mission.phase === 'takeoff', null, { timeout: 15000 });
+  check(true, 'throttle lever to TO starts the take-off roll');
+  await phone.screenshot({ path: `${SHOTS}/03-phone-fly.png` });
+
+  await setTilt(phone, 20, 0);
+  await screen.waitForFunction(() => window.__game.input.roll > 0.3, null, { timeout: 10000 });
+  check(true, 'tilting the phone right reaches the game as right roll');
+  await setTilt(phone, 0, 0);
+
+  await screen.waitForFunction(() => window.__game.mission.ac.speed > 58, null, { timeout: 120000 });
+  await setTilt(phone, 0, 10);
+  await screen.waitForFunction(() => window.__game.mission.phase === 'flight', null, { timeout: 60000 });
+  check(true, 'tilting back at Vr rotates and lifts off');
+  await setTilt(phone, 0, 0);
+  await screen.screenshot({ path: `${SHOTS}/04-climb.png` });
+
+  // Pause when the phone goes away, resume when it comes back.
+  await phone.close();
+  await screen.waitForFunction(() => window.__game.paused, null, { timeout: 30000 });
+  check(true, 'losing the phone pauses the flight');
+  await screen.screenshot({ path: `${SHOTS}/05-paused.png` });
+  phone = await openPhone();
+  await phone.click('#connect-btn');
+  await screen.waitForFunction(() => !window.__game.paused, null, { timeout: 30000 });
+  check(true, 'reconnecting the phone resumes the flight');
+  await phone.waitForSelector('#calibrate-btn:not([disabled])');
+  await phone.click('#calibrate-btn');
+
+  // Fly the rest by autopilot in fast-forward, with stills along the way.
+  await screen.evaluate(() => window.__game.fastForward(120, (m) => m.track.s > m.route.stations['storm'] + 300));
+  await screen.screenshot({ path: `${SHOTS}/06-storm.png` });
+  const phase = await screen.evaluate(() => window.__game.fastForward(200, (m) => m.phase === 'results' || m.phase === 'crashed'));
+  check(phase === 'results', `mission reaches results (${phase})`);
+  await screen.waitForSelector('#results:not(.hidden)', { timeout: 30000 });
+  await screen.screenshot({ path: `${SHOTS}/07-results.png` });
+  const stars = await screen.textContent('#res-stars');
+  check(/★/.test(stars ?? ''), `results show a star rating (${stars})`);
+  await phone.waitForFunction(() => /★|☆/.test(document.getElementById('prompt').textContent), null, { timeout: 15000 });
+  check(true, 'phone receives the result');
+  await phone.screenshot({ path: `${SHOTS}/08-phone-result.png` });
+} finally {
+  await browser.close();
+  server.kill();
+}
+
+const realErrors = errors.filter((e) => !/favicon|WebGL|GPU stall|peer error/i.test(e));
+check(realErrors.length === 0, `no page errors${realErrors.length ? `: ${realErrors.join(' | ')}` : ''}`);
+if (failures.length) {
+  console.error(`\n${failures.length} check(s) failed`);
+  process.exit(1);
+}
+console.log('\nAll end-to-end checks passed. Screenshots in ./e2e-shots');
