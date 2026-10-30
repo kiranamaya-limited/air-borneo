@@ -134,7 +134,12 @@ The first time, it asks a few questions: set up and deploy (yes), your personal 
 Open that production address on the big screen. Other deployment URLs sit behind Vercel's login protection, which phones can't pass.
 
 Online details:
-- **Pairing** goes through public Nostr relays (via [Trystero](https://github.com/dmotz/trystero)): the screen and the phone meet in a room named after the pairing code on 10 relays at once, so one being down or blocked doesn't matter, then talk directly over WebRTC. TURN relays carry the data when the phone (say on 4G) can't reach the screen directly. The offline demo keeps its own local PeerJS server. To test the online path without internet, `node scripts/test-relay.mjs` runs a local relay; build with `VITE_NOSTR_RELAYS=wss://<host>:7447`.
+- **Pairing works across different networks**, e.g. the phone on 4G and the laptop on venue Wi-Fi. Both devices only need ordinary internet access. Two paths run side by side under the 6-digit code:
+  - **direct:** a WebRTC link found through public Nostr relays (via [Trystero](https://github.com/dmotz/trystero)). It has the lowest latency and works on the same network and across most others.
+  - **relay:** public MQTT brokers over secure WebSockets (`broker.emqx.io`, `broker.hivemq.com`, `test.mosquitto.org`, all at once). It carries the game whenever a direct link can't be made.
+  - Messages go direct when that link is up and through the relay otherwise. The connection line on both screens says which path is in use ("linked directly" or "linked via relay").
+  - The offline demo keeps its own local server.
+- **Testing without internet:** `node scripts/test-relay.mjs` (Nostr) and `node scripts/test-broker.mjs` (MQTT) run local stand-ins. Build with `VITE_NOSTR_RELAYS=wss://<host>:7447 VITE_MQTT_BROKERS=wss://<host>:7448/mqtt`, adding `VITE_RELAY_ONLY=1` to test the relay path alone.
 - **Sound:** browsers hold back sound on an ordinary web page until its first click or key press, and a small "Sound off" hint shows until then. For sound from the first second, install the game: in Chrome, **⋮ → Cast, save and share → Install page as app** (or the install icon in the address bar). The installed app opens fullscreen with the lounge music on.
 
 ## How it's built

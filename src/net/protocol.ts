@@ -8,7 +8,9 @@ export type Phase = 'pairing' | 'lineup' | 'takeoff' | 'flight' | 'flare' | 'rol
 export type ControllerMsg =
   | { t: 'hello'; v: 1; device: string }
   | { t: 'input'; s: number; r: number; p: number; th: number; f: FlapSetting; cal: boolean }
-  | { t: 'btn'; b: 'action' | 'flaps' };
+  | { t: 'btn'; b: 'action' | 'flaps' }
+  /** The phone is leaving (page closed): pause straight away. */
+  | { t: 'bye' };
 
 /** Screen → phone. */
 export type ScreenMsg =

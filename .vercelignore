@@ -7,3 +7,4 @@ e2e-shots
 .preview
 *.log
 dist-relaytest
+dist-relayonly

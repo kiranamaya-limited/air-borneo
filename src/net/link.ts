@@ -14,6 +14,11 @@ export interface LinkDiagnostics {
   found: boolean;
   /** The direct link's state: 'none', 'new', 'connecting', 'connected', 'disconnected', 'failed', 'closed'. */
   link: string;
+  /** Message brokers (the relay path for different networks) currently reachable. */
+  brokers: number;
+  brokerTotal: number;
+  /** How the devices are talking: a direct link, through the relay, or not yet. */
+  path: 'direct' | 'relay' | 'none';
 }
 
 export interface ScreenLink {
@@ -38,9 +43,14 @@ export interface PhoneLink {
 export function describeLink(d: LinkDiagnostics, other: 'phone' | 'screen'): { text: string; bad: boolean } {
   const device = other === 'phone' ? 'This screen' : 'This phone';
   if (!d.online) return { text: `${device} is offline · check its Wi-Fi or mobile data`, bad: true };
-  const relays = d.relayTotal === 1 ? `Pairing server ${d.relays ? 'ok' : 'unreachable'}` : `Pairing relays ${d.relays}/${d.relayTotal}`;
-  if (d.relays === 0) return { text: `${relays} · can't reach any, retrying (a firewall may block them)`, bad: true };
-  if (d.link === 'connected') return { text: `Online · ${relays} · ${other} linked`, bad: false };
+  const parts: string[] = [];
+  if (d.relayTotal === 1) parts.push(`Pairing server ${d.relays ? 'ok' : 'unreachable'}`);
+  else if (d.relayTotal > 1) parts.push(`Relays ${d.relays}/${d.relayTotal}`);
+  if (d.brokerTotal > 0) parts.push(`Brokers ${d.brokers}/${d.brokerTotal}`);
+  const relays = parts.join(' · ');
+  if (d.relays + d.brokers === 0) return { text: `${relays} · can't reach any, retrying (a firewall may block them)`, bad: true };
+  if (d.path === 'relay') return { text: `Online · ${relays} · ${other} linked via relay`, bad: false };
+  if (d.link === 'connected') return { text: `Online · ${relays} · ${other} linked${d.brokerTotal > 0 ? ' directly' : ''}`, bad: false };
   if (d.link === 'failed') return { text: `Online · ${relays} · found the ${other} but couldn't link, retrying`, bad: true };
   if (d.found || d.link === 'connecting' || d.link === 'new') return { text: `Online · ${relays} · linking to the ${other}…`, bad: false };
   return { text: `Online · ${relays} · waiting for the ${other}`, bad: false };
@@ -146,7 +156,7 @@ class HostLink implements ScreenLink {
   }
 
   diagnostics(): LinkDiagnostics {
-    return { online: navigator.onLine, relays: this.status === 'offline' || this.status === 'starting' ? 0 : 1, relayTotal: 1, found: !!this.conn, link: this.conn?.open ? 'connected' : 'none' };
+    return { online: navigator.onLine, relays: this.status === 'offline' || this.status === 'starting' ? 0 : 1, relayTotal: 1, brokers: 0, brokerTotal: 0, found: !!this.conn, link: this.conn?.open ? 'connected' : 'none', path: this.conn?.open ? 'direct' : 'none' };
   }
 
   send(msg: ScreenMsg): void {
@@ -247,7 +257,7 @@ class ControllerLink implements PhoneLink {
   }
 
   diagnostics(): LinkDiagnostics {
-    return { online: navigator.onLine, relays: this.peer?.open ? 1 : 0, relayTotal: 1, found: !!this.conn, link: this.conn?.open ? 'connected' : 'none' };
+    return { online: navigator.onLine, relays: this.peer?.open ? 1 : 0, relayTotal: 1, brokers: 0, brokerTotal: 0, found: !!this.conn, link: this.conn?.open ? 'connected' : 'none', path: this.conn?.open ? 'direct' : 'none' };
   }
 
   send(msg: ControllerMsg): void {

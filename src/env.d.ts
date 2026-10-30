@@ -8,6 +8,11 @@ interface ImportMetaEnv {
   readonly VITE_PEER_LOCAL?: string;
   /** Comma-separated Nostr relay URLs to pair through (tests); default: Trystero's public relays. */
   readonly VITE_NOSTR_RELAYS?: string;
+  /** Comma-separated MQTT-over-WebSocket broker URLs (tests); default: public brokers. */
+  readonly VITE_MQTT_BROKERS?: string;
+  /** Tests only: '1' forces the relay path (no WebRTC) or the direct path (no brokers). */
+  readonly VITE_RELAY_ONLY?: string;
+  readonly VITE_DIRECT_ONLY?: string;
 }
 
 interface ImportMeta {

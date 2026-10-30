@@ -92,7 +92,7 @@ try {
   await phone.click('#connect-btn');
   await phone.waitForSelector('#calibrate-btn:not([disabled])', { timeout: 30000 });
   await phone.waitForFunction(() => window.__yoke.state.connected, null, { timeout: 30000 });
-  check(true, 'phone connected to the screen over WebRTC');
+  check(true, 'phone connected to the screen');
   await phone.screenshot({ path: `${SHOTS}/02-phone-calibrate.png` });
   await phone.click('#calibrate-btn');
   await screen.waitForFunction(() => window.__game.mission.phase === 'lineup', null, { timeout: 30000 });
