@@ -1,7 +1,8 @@
 /**
- * Synthesised sound: lounge music, PW127 turboprop drone, wind gusts, rain, thunder, passenger
- * reactions, cabin chimes, marker chimes and cockpit alerts. Callouts and the captain's PA use the
- * browser's speech synthesis.
+ * Synthesised sound: lounge music, CFM56 turbofan rumble and whine, wind gusts, rain, thunder, passenger
+ * reactions, cabin chimes, marker chimes and cockpit alerts. The captain's announcements and the
+ * cockpit callouts are recorded voice clips (public/voice, made by scripts/voices.py), the PA played
+ * through a cabin-speaker chain; any line without a clip falls back to the browser's speech synthesis.
  *
  * Audio starts without a click wherever the browser allows it (the Mac app and the demo launcher
  * enable autoplay); otherwise it starts silently on the first key press or tap.
@@ -10,6 +11,7 @@ import type { Grade } from '../game/scoring';
 import type { Reaction } from '../game/comfort';
 import { LoungeMusic } from './music';
 import { PassengerVoices } from './passengers';
+import { VOICE_LINES, voiceFor, type VoiceKind } from './lines';
 
 /** Lounge music level: the main thing you hear, above the engines. */
 const MUSIC_LEVEL = 0.5;
@@ -32,12 +34,17 @@ export class GameAudio {
   private music?: LoungeMusic;
   private voices?: PassengerVoices;
   private paSpeaking = false;
+  private readonly clips = new Map<string, AudioBuffer>();
+  private voicesRequested = false;
+  private paIn?: AudioNode;
+  private calloutIn?: AudioNode;
+  private clipsPlayed = 0;
   private gustPhase = 0;
   muted = false;
 
   /** For tests: is sound running, and is the lounge music playing? */
-  get state(): { context: string; music: boolean } {
-    return { context: this.ctx?.state ?? 'none', music: !!this.music?.isPlaying };
+  get state(): { context: string; music: boolean; voices: number; clipsPlayed: number } {
+    return { context: this.ctx?.state ?? 'none', music: !!this.music?.isPlaying, voices: this.clips.size, clipsPlayed: this.clipsPlayed };
   }
 
   get unlocked(): boolean {
@@ -48,6 +55,7 @@ export class GameAudio {
   init(): void {
     if (!this.ctx) this.build();
     this.pickVoice();
+    void this.loadVoices();
     void this.ctx?.resume().then(() => this.music?.start());
     this.music?.start();
   }
@@ -85,10 +93,10 @@ export class GameAudio {
       return src;
     };
 
-    // Propeller blade-pass drone.
+    // Turbofan core rumble (N2) under a soft low-pass.
     const propFilter = ctx.createBiquadFilter();
     propFilter.type = 'lowpass';
-    propFilter.frequency.value = 520;
+    propFilter.frequency.value = 240;
     this.propGain = ctx.createGain();
     this.propGain.gain.value = 0;
     this.propOsc = ctx.createOscillator();
@@ -103,7 +111,7 @@ export class GameAudio {
     this.propOsc.start();
     this.propOsc2.start();
 
-    // Turbine whine.
+    // Fan whine (N1 blade-pass).
     this.whine = ctx.createOscillator();
     this.whine.type = 'sine';
     this.whineGain = ctx.createGain();
@@ -111,11 +119,11 @@ export class GameAudio {
     this.whine.connect(this.whineGain).connect(this.master);
     this.whine.start();
 
-    // Prop wash.
+    // Jet roar.
     const wash = ctx.createBiquadFilter();
     wash.type = 'bandpass';
-    wash.frequency.value = 700;
-    wash.Q.value = 0.6;
+    wash.frequency.value = 380;
+    wash.Q.value = 0.5;
     this.washGain = ctx.createGain();
     this.washGain.gain.value = 0;
     loop().connect(wash).connect(this.washGain).connect(this.master);
@@ -138,6 +146,88 @@ export class GameAudio {
 
     this.music = new LoungeMusic(ctx, this.master, this.noise);
     this.voices = new PassengerVoices(ctx, this.master, this.noise);
+
+    // The captain on the cabin PA: telephone-band speakers, a touch of drive, a small cabin's echo.
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 320;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3600;
+    const presence = ctx.createBiquadFilter();
+    presence.type = 'peaking';
+    presence.frequency.value = 1900;
+    presence.gain.value = 4;
+    const drive = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / (curve.length - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * 1.8) / Math.tanh(1.8);
+    }
+    drive.curve = curve;
+    const room = ctx.createConvolver();
+    const irLen = Math.floor(ctx.sampleRate * 0.45);
+    const ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / irLen) ** 4;
+    }
+    room.buffer = ir;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.18;
+    const pa = ctx.createGain();
+    pa.gain.value = 0.95;
+    hp.connect(lp).connect(presence).connect(drive).connect(pa).connect(this.master);
+    drive.connect(room).connect(wet).connect(this.master);
+    this.paIn = hp;
+    // Cockpit callouts: dry and close, a little quieter.
+    const cockpit = ctx.createBiquadFilter();
+    cockpit.type = 'highpass';
+    cockpit.frequency.value = 160;
+    const cg = ctx.createGain();
+    cg.gain.value = 0.7;
+    cockpit.connect(cg).connect(this.master);
+    this.calloutIn = cockpit;
+  }
+
+  /** Fetch and decode the recorded voice clips listed in public/voice/index.json (if any). */
+  private async loadVoices(): Promise<void> {
+    const ctx = this.ctx;
+    if (!ctx || this.voicesRequested) return;
+    this.voicesRequested = true;
+    let available: string[] = [];
+    try {
+      const res = await fetch('/voice/index.json', { cache: 'no-cache' });
+      if (!res.ok) return;
+      available = (await res.json()) as string[];
+    } catch {
+      return; // no clips: speech synthesis it is
+    }
+    const wanted = VOICE_LINES.filter((l) => available.includes(l.id));
+    await Promise.all(
+      wanted.map(async (l) => {
+        try {
+          const data = await (await fetch(`/voice/${l.id}.mp3`)).arrayBuffer();
+          this.clips.set(l.id, await ctx.decodeAudioData(data));
+        } catch {
+          /* this line falls back to speech synthesis */
+        }
+      }),
+    );
+  }
+
+  private playClip(buffer: AudioBuffer, kind: VoiceKind): void {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect((kind === 'pa' ? this.paIn : this.calloutIn) ?? this.master);
+    if (kind === 'pa') {
+      this.paSpeaking = true;
+      src.onended = () => (this.paSpeaking = false);
+      this.music?.duck(0.3, buffer.duration + 0.6);
+    }
+    src.start(ctx.currentTime + 0.05);
+    this.clipsPlayed++;
   }
 
   private pickVoice(): void {
@@ -156,13 +246,14 @@ export class GameAudio {
     const t = ctx.currentTime;
     const k = 0.15;
     // The engines sit well under the music: a soft hum, not a roar.
-    const blade = 38 + s.prop * 78;
-    this.propOsc.frequency.setTargetAtTime(blade, t, k);
-    this.propOsc2.frequency.setTargetAtTime(blade * 2.01, t, k);
-    this.propGain.gain.setTargetAtTime(this.muted ? 0 : 0.012 + s.prop * 0.03, t, k);
-    this.whine.frequency.setTargetAtTime(1500 + s.prop * 1600, t, k);
-    this.whineGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.0025, t, k);
-    this.washGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.028, t, k);
+    const core = 32 + s.prop * 46;
+    this.propOsc.frequency.setTargetAtTime(core, t, 0.6);
+    this.propOsc2.frequency.setTargetAtTime(core * 1.51, t, 0.6);
+    this.propGain.gain.setTargetAtTime(this.muted ? 0 : 0.01 + s.prop * 0.024, t, 0.4);
+    // Spools up slowly, like a real jet.
+    this.whine.frequency.setTargetAtTime(1100 + s.prop * 2600, t, 1.2);
+    this.whineGain.gain.setTargetAtTime(this.muted ? 0 : 0.0006 + s.prop * 0.0032, t, 0.8);
+    this.washGain.gain.setTargetAtTime(this.muted ? 0 : s.prop * 0.034, t, 0.8);
     // Wind swells with gusts and rough air.
     this.gustPhase += dt * (0.6 + s.turb * 2.5);
     const swell = 1 + s.gust * 0.9 * (0.5 + 0.5 * Math.sin(this.gustPhase)) + s.turb * 0.6 * Math.abs(Math.sin(this.gustPhase * 2.3));
@@ -248,8 +339,15 @@ export class GameAudio {
   }
 
   /** Cockpit callouts are short and may interrupt each other; the captain's PA is never cut off. */
-  speak(text: string, kind: 'callout' | 'pa' = 'callout'): void {
-    if (this.muted || !('speechSynthesis' in window)) return;
+  speak(text: string, kind: VoiceKind = 'callout'): void {
+    if (this.muted) return;
+    const recorded = voiceFor(text);
+    const clip = recorded && this.clips.get(recorded.id);
+    if (clip && this.ctx) {
+      this.playClip(clip, kind);
+      return;
+    }
+    if (!('speechSynthesis' in window)) return;
     if (kind === 'callout' && this.paSpeaking) return;
     try {
       const u = new SpeechSynthesisUtterance(text);

@@ -1,5 +1,5 @@
 /**
- * Arcade flight model for an ATR 72-500, tuned so tilt control feels like a yoke while the numbers
+ * Arcade flight model for a Boeing 737-800, tuned so tilt control feels like a yoke while the numbers
  * the player sees stay real: Vr 110 kt, take-off flaps 15, landing flaps 30, 3° glide path,
  * touchdown sink rate in feet per minute.
  *
@@ -10,7 +10,10 @@ import { DEG, dirFromHeading, type P3 } from './route';
 import type { FlapSetting } from '../net/protocol';
 
 export const G = 9.81;
-export const VR = 57; // m/s ≈ 110 kt
+export const VR = 57; // m/s, shown as VR_KT on the speed tape
+/** Boeing 737-800 take-off speeds as the cockpit shows them. */
+export const V1_KT = 145;
+export const VR_KT = 150;
 export const VLOF = VR + 3;
 export const TURN_GAIN = 4; // compressed world: turns are 4x tighter than real for the same bank
 export const MAX_BANK = 35;
@@ -18,12 +21,12 @@ export const MAX_BANK = 35;
 export const ROLL_RATE = 45;
 /** Tilt changes the flight path by up to this many degrees either side of the trimmed path. */
 export const PITCH_AUTHORITY = 9;
-export const TAIL_STRIKE_PITCH = 9;
+export const TAIL_STRIKE_PITCH = 11; // Boeing 737-800 geometric limit with the main gear compressed
 /**
  * Flare model: below `zone` metres the power is at idle and the aircraft cannot climb. Pulling back
  * cuts the sink rate; as speed bleeds off below `fadeSpeed` the lift fades and it settles anyway.
  */
-export const FLARE = { zone: 9, base: 0.25, fadeSpeed: 72, fade: 0.2, decel: 2.5 }; // ATR 72 geometric limit is ~9-10° with struts compressed
+export const FLARE = { zone: 9, base: 0.25, fadeSpeed: 72, fade: 0.2, decel: 2.5 }; 
 const GEAR_HEIGHT = 2.45; // fuselage axis above the main wheels' contact point
 
 export interface FlightInput {
@@ -68,7 +71,7 @@ export class Aircraft {
   flaps: FlapSetting = 0;
   flapAngle = 0;
   thrust = 0; // spooled throttle 0..1
-  prop = 0; // prop rpm fraction for visuals/audio
+  prop = 0; // engine N1 fraction for visuals/audio
   load = 1; // g
   touchdownFpm = 0;
   tailStruck = false;
@@ -283,11 +286,11 @@ function piecewise(x: number, pts: [number, number][]): number {
 export function ias(speed: number): number {
   return piecewise(speed, [
     [0, 0],
-    [VR, 110],
-    [88, 120],
-    [110, 170],
-    [150, 210],
-    [210, 275],
+    [VR, VR_KT],
+    [88, 165],
+    [110, 200],
+    [150, 250],
+    [210, 290],
   ]);
 }
 

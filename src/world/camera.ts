@@ -42,16 +42,16 @@ export class CameraRig {
     let fov = 58;
 
     if (phase === 'pairing') {
-      // Slow orbit around the ATR waiting on runway 25.
+      // Slow orbit around the 737 waiting on the runway.
       this.orbit += dt * 0.06;
       const a = this.orbit + 0.9;
-      cam.position.set(p.x + Math.sin(a) * 62, p.y + 14 + Math.sin(this.orbit * 0.7) * 4, p.z + Math.cos(a) * 62);
+      cam.position.set(p.x + Math.sin(a) * 86, p.y + 18 + Math.sin(this.orbit * 0.7) * 5, p.z + Math.cos(a) * 86);
       cam.lookAt(p.x, p.y + 1, p.z);
     } else if (phase === 'results' || phase === 'crashed') {
       this.orbit += dt * 0.08;
       const a = this.orbit + ((-ac.heading - 120) * DEG);
-      const dist = phase === 'crashed' ? 140 : 58;
-      cam.position.set(p.x + Math.sin(a) * dist, Math.max(p.y + 16, 18), p.z + Math.cos(a) * dist);
+      const dist = phase === 'crashed' ? 160 : 82;
+      cam.position.set(p.x + Math.sin(a) * dist, Math.max(p.y + 20, 22), p.z + Math.cos(a) * dist);
       cam.lookAt(p.x, p.y, p.z);
       fov = 50;
     } else {
@@ -62,13 +62,13 @@ export class CameraRig {
       this.gamma += (ac.gamma - this.gamma) * k;
       this.bank += (ac.bank - this.bank) * (1 - Math.exp(-dt * 3));
       const ground = ac.onGround;
-      const back = ground ? 34 : 42;
-      const up = ground ? 8.5 : 10.5;
+      const back = ground ? 50 : 60;
+      const up = ground ? 12 : 14.5;
       const fwd = headingDir(this.hdg);
       const g = this.gamma * DEG * 0.8;
       const offset = fwd.clone().multiplyScalar(-back * Math.cos(g)).add(new THREE.Vector3(0, up - back * Math.sin(g), 0));
       cam.position.copy(p).add(offset);
-      this.look.copy(p).addScaledVector(headingDir(ac.heading), 28).add(new THREE.Vector3(0, 2.5 + Math.sin(ac.gamma * DEG) * 28, 0));
+      this.look.copy(p).addScaledVector(headingDir(ac.heading), 36).add(new THREE.Vector3(0, 4 + Math.sin(ac.gamma * DEG) * 36, 0));
       cam.lookAt(this.look);
       // Lean into turns a little.
       cam.rotateZ(-this.bank * DEG * 0.22);

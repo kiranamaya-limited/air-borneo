@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { brand } from '../brand/tokens';
 import { KCH_LAYOUT, KLIA_LAYOUT, kchFrame, kliaFrame, type Frame } from '../game/layout';
 import { designator as runwayName, type Route } from '../game/route';
-import { AircraftModel } from './aircraft';
+import { AXIS_HEIGHT, AircraftModel } from './aircraft';
 import type { Aircraft } from '../game/flight';
 
 /**
@@ -399,12 +399,12 @@ export class Airports {
     hRoof.rotation.y = (-f.heading * Math.PI) / 180;
     g.add(hRoof);
 
-    // Another AirBorneo ATR on stand, nose in towards the terminal, plus ground equipment.
+    // Another AirBorneo 737 on stand, nose in towards the terminal, plus ground equipment.
     const parked = new AircraftModel();
     const pp = f.toWorld(-850, 300);
     parked.root.position.set(pp.x, 0, pp.z);
     parked.root.rotation.y = (-(f.heading + 90) * Math.PI) / 180;
-    parked.body.position.y = 2.45;
+    parked.body.position.y = AXIS_HEIGHT;
     g.add(parked.root);
     this.parked.push(parked);
     const gse = new THREE.MeshStandardMaterial({ color: brand.colors.yellow, roughness: 0.6 });

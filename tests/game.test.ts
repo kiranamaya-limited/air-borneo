@@ -5,6 +5,7 @@ import { Comfort } from '../src/game/comfort';
 import { Scorer, gradeFor, landingGrade } from '../src/game/scoring';
 import { Mission } from '../src/game/mission';
 import { autopilot } from '../src/game/autopilot';
+import { VOICE_LINES, voiceFor } from '../src/audio/lines';
 
 const CALM = { wind: { x: 0, y: 0, z: 0 }, rollDisturb: 0, pitchDisturb: 0 };
 
@@ -103,8 +104,8 @@ describe('flight model', () => {
   });
 
   it('maps instruments to realistic readings', () => {
-    expect(ias(VR)).toBeCloseTo(110);
-    expect(ias(210)).toBeCloseTo(275);
+    expect(ias(VR)).toBeCloseTo(150);
+    expect(ias(210)).toBeCloseTo(290);
     expect(altitudeFt(300)).toBeCloseTo(17000);
     expect(altitudeFt(30)).toBeCloseTo(98.5, 0);
   });
@@ -149,6 +150,7 @@ function fly(seed: number) {
   let touchdownAt = 0;
   const phases = new Set<string>();
   const reactions: string[] = [];
+  const spoken: string[] = [];
   while (t < 300 && m.phase !== 'results' && m.phase !== 'crashed') {
     const ap = autopilot(m.ac, m.route, m.track);
     const throttle = m.phase === 'rollout' ? 0 : 1;
@@ -158,12 +160,29 @@ function fly(seed: number) {
       if (e.type === 'liftoff') airborneAt = t;
       if (e.type === 'touchdown') touchdownAt = t;
       if (e.type === 'reaction') reactions.push(e.kind);
+      if (e.type === 'callout') spoken.push(e.speak ?? e.text);
+      if (e.type === 'pa') spoken.push(e.text);
     }
     phases.add(m.phase);
     t += dt;
   }
-  return { m, airTime: touchdownAt - airborneAt, phases, reactions };
+  return { m, airTime: touchdownAt - airborneAt, phases, reactions, spoken };
 }
+
+describe('voice', () => {
+  it('has a recorded line for everything the crew says on a flight', () => {
+    const { spoken } = fly(7);
+    expect(spoken.length).toBeGreaterThan(10);
+    const missing = [...new Set(spoken)].filter((t) => !voiceFor(t));
+    expect(missing).toEqual([]);
+  });
+
+  it('lists every line once, with a unique id', () => {
+    const ids = VOICE_LINES.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const l of VOICE_LINES) expect(['pa', 'callout']).toContain(l.kind);
+  });
+});
 
 describe('mission', () => {
   it('starts straight on the runway, no cutscene', () => {

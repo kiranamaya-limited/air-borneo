@@ -1,5 +1,5 @@
 /**
- * Passenger comfort: the heart of the game. 68 people are on board and they feel everything:
+ * Passenger comfort: the heart of the game. 162 people are on board and they feel everything:
  * steep banks, yanking the yoke, sudden drops, shaking in rough air, wandering off course and a
  * hard landing. Comfort drains while they're unhappy and slowly recovers while the flight is
  * smooth. Discrete reactions (gasps, screams, someone being sick, applause) are emitted for the
@@ -8,7 +8,7 @@
 
 export type Reaction = 'gasp' | 'whoa' | 'scream' | 'vomit' | 'nervous' | 'lightning' | 'happy' | 'applause';
 
-export const PASSENGERS = 68;
+export const PASSENGERS = 162;
 
 /** What the passengers feel this frame. */
 export interface Feel {

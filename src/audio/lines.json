@@ -1,0 +1,122 @@
+[
+  {
+    "id": "pa-welcome",
+    "kind": "pa",
+    "text": "Good afternoon, ladies and gentlemen, this is your captain speaking. Welcome aboard AirBorneo flight one zero one to Kuching. Our flying time today is about one hour and forty five minutes. Sit back, relax, and let us take you home."
+  },
+  {
+    "id": "pa-bumps",
+    "kind": "pa",
+    "text": "Ladies and gentlemen, this is the captain. We are passing through some rough air, so I have switched the seat belt sign on. Please return to your seats and keep your seat belts fastened. Thank you."
+  },
+  {
+    "id": "pa-home",
+    "kind": "pa",
+    "text": "Ladies and gentlemen, if you look out of the left side of the aircraft, you will see Mount Santubong. Welcome back to Sarawak. We will be on the ground in Kuching very shortly."
+  },
+  {
+    "id": "pa-descent",
+    "kind": "pa",
+    "text": "Cabin crew, prepare for landing."
+  },
+  {
+    "id": "pa-arrival",
+    "kind": "pa",
+    "text": "Ladies and gentlemen, selamat datang ke Kuching, and welcome home. Please remain seated with your seat belt fastened until the aircraft has come to a complete stop. On behalf of all of us at AirBorneo, thank you for flying with us."
+  },
+  {
+    "id": "power-set",
+    "kind": "callout",
+    "text": "Power set"
+  },
+  {
+    "id": "flaps-15",
+    "kind": "callout",
+    "text": "Flaps fifteen"
+  },
+  {
+    "id": "100-knots",
+    "kind": "callout",
+    "text": "One hundred knots"
+  },
+  {
+    "id": "v1",
+    "kind": "callout",
+    "text": "V one"
+  },
+  {
+    "id": "rotate",
+    "kind": "callout",
+    "text": "Rotate"
+  },
+  {
+    "id": "tail-strike",
+    "kind": "callout",
+    "text": "Tail strike"
+  },
+  {
+    "id": "gear-up",
+    "kind": "callout",
+    "text": "Positive rate. Gear up."
+  },
+  {
+    "id": "flaps-up",
+    "kind": "callout",
+    "text": "Flaps up"
+  },
+  {
+    "id": "gear-down",
+    "kind": "callout",
+    "text": "Gear down"
+  },
+  {
+    "id": "flaps-30",
+    "kind": "callout",
+    "text": "Flaps thirty"
+  },
+  {
+    "id": "minimums",
+    "kind": "callout",
+    "text": "Minimums"
+  },
+  {
+    "id": "ra-100",
+    "kind": "callout",
+    "text": "One hundred"
+  },
+  {
+    "id": "ra-50",
+    "kind": "callout",
+    "text": "Fifty"
+  },
+  {
+    "id": "ra-30",
+    "kind": "callout",
+    "text": "Thirty"
+  },
+  {
+    "id": "ra-10",
+    "kind": "callout",
+    "text": "Ten"
+  },
+  {
+    "id": "land-butter",
+    "kind": "callout",
+    "text": "Butter!"
+  },
+  {
+    "id": "land-smooth",
+    "kind": "callout",
+    "text": "Smooth"
+  },
+  {
+    "id": "land-firm",
+    "kind": "callout",
+    "text": "Firm"
+  },
+  {
+    "id": "land-hard",
+    "kind": "callout",
+    "text": "Hard"
+  }
+]

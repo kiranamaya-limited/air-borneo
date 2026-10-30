@@ -1,15 +1,16 @@
 /**
- * The mission: fly AB 101 and its 68 passengers home from Kuala Lumpur to Kuching, smoothly.
+ * The mission: fly AB 101 and its 162 passengers home from Kuala Lumpur to Kuching, smoothly.
  * A renderer-independent state machine that owns the aircraft, weather, route tracking, markers,
  * passenger comfort, prompts and scoring. The 3D world, HUD, audio and phone link all read from it.
  */
-import { Aircraft, ias, type FlightContext, type FlightInput } from './flight';
+import { Aircraft, V1_KT, VR_KT, ias, type FlightContext, type FlightInput } from './flight';
 import { DEG, KCH, KLIA, Route, designator, lineupPoint, type P3, type Track } from './route';
 import { WeatherSystem, type Alert, type Weather } from './hazards';
 import { Scorer, type Grade, type Summary } from './scoring';
 import { kchLandingFrame, type Frame } from './layout';
 import type { Reaction } from './comfort';
 import { CABIN_STORIES, lineFor } from './stories';
+import { line } from '../audio/lines';
 import type { FlapSetting, Phase, Want } from '../net/protocol';
 
 export type MissionEvent =
@@ -119,7 +120,7 @@ export class Mission {
     this.say('atc-lineup', { type: 'atc', text: `AirBorneo 101, wind 240 degrees 8 knots, runway ${Mission.depRunway}, cleared for take-off.` });
     this.say('pa-welcome', {
       type: 'pa',
-      text: 'Ladies and gentlemen, welcome aboard AirBorneo flight 101 to Kuching. Sit back, relax, we are taking you home.',
+      text: line('pa-welcome'),
     });
   }
 
@@ -200,10 +201,10 @@ export class Mission {
     const events = ac.step(dt, input, CALM, ctx);
     this.track = this.route.track(ac.pos, this.track.index);
     const kt = ias(ac.speed);
-    if (kt >= 80) this.say('80', { type: 'callout', text: '80 knots', speak: 'Eighty knots' });
-    if (kt >= 105) this.say('v1', { type: 'callout', text: 'V1', speak: 'V one' });
-    if (kt >= 110) this.say('vr', { type: 'callout', text: 'ROTATE', speak: 'Rotate' });
-    if (kt >= 110) {
+    if (kt >= 100) this.say('100kt', { type: 'callout', text: '100 knots', speak: 'One hundred knots' });
+    if (kt >= V1_KT) this.say('v1', { type: 'callout', text: 'V1', speak: 'V one' });
+    if (kt >= VR_KT) this.say('vr', { type: 'callout', text: 'ROTATE', speak: 'Rotate' });
+    if (kt >= VR_KT) {
       this.want = 'pitch-up';
       this.prompt = 'ROTATE · nose up gently';
     } else {
@@ -283,7 +284,7 @@ export class Mission {
     if (this.comfort < 60) {
       this.say('pa-bumps', {
         type: 'pa',
-        text: 'Ladies and gentlemen, this is your captain. Sorry about the bumps. Please keep your seatbelts fastened.',
+        text: line('pa-bumps'),
       });
     }
 
@@ -329,12 +330,12 @@ export class Mission {
       this.say('atc-kch', { type: 'atc', text: 'AirBorneo 101, Kuching Approach, descend 3000 feet, expect runway 25. Selamat pulang.' });
       this.say('pa-home', {
         type: 'pa',
-        text: 'Ladies and gentlemen, Mount Santubong is off the left side. Welcome back to Sarawak, we are nearly home.',
+        text: line('pa-home'),
       });
     }
     if (s > st['base']) {
       this.say('atc-app', { type: 'atc', text: 'AirBorneo 101, Kuching Approach, cleared ILS runway 25.' });
-      this.say('pa-descent', { type: 'pa', text: 'Cabin crew, prepare for landing.' });
+      this.say('pa-descent', { type: 'pa', text: line('pa-descent') });
       if (!this.said.has('chime-descent')) {
         this.said.add('chime-descent');
         this.emit({ type: 'chime' });
@@ -430,7 +431,7 @@ export class Mission {
     this.want = idle ? 'none' : 'throttle-idle';
     if (ac.speed < 18) {
       this.say('atc-ground', { type: 'atc', text: 'AirBorneo 101, welcome home. Thanks for bringing them back safely.' });
-      this.say('pa-arrival', { type: 'pa', text: 'Ladies and gentlemen, selamat datang ke Kuching. Welcome home, and thank you for flying AirBorneo.' });
+      this.say('pa-arrival', { type: 'pa', text: line('pa-arrival') });
       this.emit({ type: 'chime' });
       this.finish();
     }

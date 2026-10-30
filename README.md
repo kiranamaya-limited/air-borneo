@@ -1,6 +1,6 @@
 # AirBorneo · Coming Home
 
-A three.js flying game for AirBorneo. **68 Sarawakians are flying home** from Kuala Lumpur: students back for the holidays, families going home for Gawai, a grandmother who has waited all year. Fly AirBorneo flight 101, an ATR 72-500, from **Kuala Lumpur International (WMKK)** home to **Kuching (WBGG)**, and **keep them comfortable**. Your phone is the control yoke and the game runs on a big screen (a laptop, TV or booth display), with lounge music playing throughout.
+A three.js flying game for AirBorneo. **162 Sarawakians are flying home** from Kuala Lumpur: students back for the holidays, families going home for Gawai, a grandmother who has waited all year. Fly AirBorneo flight 101, a Boeing 737-800, from **Kuala Lumpur International (WMKK)** home to **Kuching (WBGG)**, and **keep them comfortable**. Your phone is the control yoke and the game runs on a big screen (a laptop, TV or booth display), with lounge music playing throughout.
 
 - **It starts straight away**, lined up on KLIA's runway 32R. Push the throttle to TO (flaps 15 are set for you if you forget), then tip the top edge of the phone away from you to rotate at 110 kt (pitch starts inverted, like a flight sim; the phone's pitch button switches it for the session).
 - **Passenger comfort is the score.** The cabin panel shows the passengers' faces and you hear them react:
@@ -22,6 +22,15 @@ A three.js flying game for AirBorneo. **68 Sarawakians are flying home** from Ku
 - **Results:** stars from passenger comfort and the landing, ranked Trainee → First Officer → Captain → Senior Captain → **Smooth Operator**. They also show how many passengers had a lovely flight, how many needed sick bags, and the biggest complaint.
 
 **Sound:** a synthesised bossa-nova lounge loop, wind gusts, rain, thunder, cabin chimes, the captain's PA, and passenger voices made with formant synthesis. No audio files.
+
+**Captain's voice:** the announcements and cockpit callouts are recorded clips made with [Piper](https://github.com/rhasspy/piper), a free neural voice, and the captain plays through a cabin-speaker effect. Every line lives in `src/audio/lines.json`. To (re)record them, with Python 3 and ffmpeg installed:
+
+```bash
+pip install piper-tts
+python3 scripts/voices.py
+```
+
+This writes `public/voice/*.mp3` and `public/voice/index.json`. Without clips, the game falls back to the browser's built-in voice.
 
 ## Play
 
@@ -135,7 +144,7 @@ index.html / controller.html    big screen / phone pages
 src/net/                        PeerJS link + message protocol
 src/controller/                 phone: tilt maths (tilt.ts), UI, 30 Hz input stream
 src/game/                       renderer-independent: route, flight model, weather, scoring, mission state machine
-src/world/                      three.js: procedural ATR 72, airports, terrain, ocean, sky, clouds, rain, markers, camera
+src/world/                      three.js: procedural Boeing 737-800, airports, terrain, ocean, sky, clouds, rain, markers, camera
 src/ui/  src/audio/             HUD, screens, synthesised engine/weather sound + spoken callouts
 src/brand/                      design tokens (colours, fonts): the one place to change the look
 ```
@@ -144,7 +153,7 @@ src/brand/                      design tokens (colours, fonts): the one place to
 - KLIA runway 14L/32R is about 4,000 × 60 m. Take-off is on 32R.
 - Kuching runway 07/25 is 3,780 × 46 m on 068°/248°. Landing is on 25.
 - Runway markings follow ICAO, with PAPI and sequenced approach lights.
-- The ATR 72-500 is built to its real dimensions (27.17 m long, 27.05 m span) and has six-blade props, black de-icing boots and a T-tail.
+- The Boeing 737-800 is built to its real dimensions (39.47 m long, 35.79 m span with blended winglets) with CFM56-7 engines, a low swept wing and main gear that folds into the wing root.
 - The route is the 523 NM great-circle KUL–KCH, compressed for play. The instruments still read realistic knots, feet and flight levels.
 
 ## Brand assets

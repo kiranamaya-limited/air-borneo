@@ -24,7 +24,7 @@ export const brand = {
   },
   fonts: {
     ui: "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
-    // B612 was designed by Airbus for cockpit displays (ATR is an Airbus/Leonardo partnership).
+    // B612 was designed for cockpit displays.
     instrument: "'B612 Mono', 'B612', ui-monospace, monospace",
   },
 } as const;
@@ -36,6 +36,6 @@ export const flight = {
   to: { code: 'KCH', icao: 'WBGG', name: 'Kuching International', city: 'Kuching' },
   distanceNm: 523, // great-circle KUL-KCH
   blockTime: '1h 45m',
-  aircraft: 'ATR 72-500',
-  passengers: 68,
+  aircraft: 'Boeing 737-800',
+  passengers: 162,
 } as const;

@@ -1,6 +1,6 @@
 /** The big-screen head-up display: tapes, prompts, alerts, score, route progress and ATC. */
 import { brand, flight } from '../brand/tokens';
-import { altitudeFt, ias, verticalSpeedFpm } from '../game/flight';
+import { VR_KT, altitudeFt, ias, verticalSpeedFpm } from '../game/flight';
 import type { Mission } from '../game/mission';
 import type { Grade } from '../game/scoring';
 import type { LinkStatus } from '../net/link';
@@ -42,6 +42,9 @@ export class Hud {
   private readonly atc = $('hud-atc');
   private readonly radioLabel = $('hud-radio-label');
   private faceMood: Mood | null = null;
+  private readonly comfortHero = $('comfort-hero');
+  private lastComfort = 100;
+  private dropTimer = 0;
   private readonly radio = $('hud-radio');
   private readonly nm = $('hud-nm');
   private readonly progress = $('hud-progress');
@@ -152,6 +155,15 @@ export class Hud {
     this.comfortVal.className = `score-value mono${c < 50 ? ' bad' : c < 75 ? ' warn' : ''}`;
     this.comfortBar.style.width = `${c}%`;
     this.comfortBar.style.background = c > 75 ? brand.colors.good : c > 50 ? brand.colors.yellow : brand.colors.red;
+    // A visible jolt on the meter whenever the cabin loses comfort.
+    if (c < this.lastComfort - 0.15 && !this.dropTimer) {
+      this.comfortHero.classList.add('drop');
+      this.dropTimer = window.setTimeout(() => {
+        this.comfortHero.classList.remove('drop');
+        this.dropTimer = 0;
+      }, 650);
+    }
+    this.lastComfort = c;
     const mood = comfortMood(c);
     if (mood !== this.faceMood) {
       this.faceMood = mood;
@@ -247,7 +259,7 @@ export class Hud {
   }
 
   private drawSpeed(kt: number): void {
-    this.drawVerticalTape(this.speedTape, kt, 3, 10, 20, 'IAS KT', (v) => `${Math.round(v)}`, 'VR 110', 0);
+    this.drawVerticalTape(this.speedTape, kt, 3, 10, 20, 'IAS KT', (v) => `${Math.round(v)}`, `VR ${VR_KT}`, 0);
   }
 
   private drawAltitude(ft: number, fpm: number): void {

@@ -1,41 +1,41 @@
 /**
- * Procedural ATR 72-500F at real dimensions: 27.17 m long, 27.05 m span, 7.65 m tall.
- * High straight wing with black de-icing boots, two PW127 nacelles with six-blade props,
- * T-tail with dorsal fillet, main gear retracting into fuselage sponsons, passenger windows.
+ * Procedural Boeing 737-800 at real dimensions: 39.47 m long, 35.79 m span with blended winglets,
+ * 12.5 m tall. Low wing swept 25° with 6° dihedral, two CFM56-7B engines on pylons, conventional
+ * tail with a tall swept fin, main gear folding inwards into the wing root, nose gear forwards.
  *
- * Local axes: nose towards -z, right wing +x, up +y. The fuselage axis is 2.45 m above the
+ * Local axes: nose towards -z, right wing +x, up +y. The fuselage axis is AXIS_HEIGHT above the
  * main wheels' contact point.
  */
 import * as THREE from 'three';
 import { airfoil, ellipse, loft, type Section } from './geom';
-import { paintFin, paintFuselage, paintPropDisc } from './livery';
+import { paintFanFace, paintFin, paintFuselage } from './livery';
 import type { Aircraft } from '../game/flight';
 
-const AXIS_HEIGHT = 2.45;
-const NOSE_Z = -13.58;
-const LENGTH = 27.16;
+export const AXIS_HEIGHT = 3.2;
+const NOSE_Z = -19.73;
+const LENGTH = 39.47;
+/** Main gear position along the fuselage: the aircraft pivots here on the ground. */
+const MAIN_Z = 0.6;
 
 // z, half-width, half-height, centre y
 const FUSELAGE: [number, number, number, number][] = [
-  [-13.58, 0.06, 0.06, -0.22],
-  [-13.47, 0.42, 0.38, -0.2],
-  [-13.25, 0.7, 0.64, -0.15],
-  [-12.9, 0.95, 0.9, -0.08],
-  [-12.4, 1.17, 1.14, -0.02],
-  [-11.7, 1.33, 1.33, 0.0],
-  [-10.6, 1.42, 1.42, 0.02],
-  [-6.0, 1.43, 1.43, 0.02],
-  [4.6, 1.43, 1.43, 0.02],
-  [6.6, 1.37, 1.35, 0.09],
-  [8.6, 1.2, 1.12, 0.3],
-  [10.6, 0.94, 0.84, 0.6],
-  [12.2, 0.64, 0.54, 0.92],
-  [13.2, 0.38, 0.3, 1.12],
-  [13.58, 0.1, 0.08, 1.2],
+  [-19.73, 0.08, 0.08, -0.45],
+  [-19.55, 0.5, 0.48, -0.42],
+  [-19.2, 0.88, 0.86, -0.34],
+  [-18.6, 1.25, 1.26, -0.22],
+  [-17.8, 1.55, 1.6, -0.1],
+  [-16.8, 1.76, 1.86, -0.02],
+  [-15.5, 1.86, 1.98, 0.0],
+  [-14.0, 1.88, 2.0, 0.0],
+  [8.5, 1.88, 2.0, 0.0],
+  [10.5, 1.84, 1.95, 0.08],
+  [12.5, 1.68, 1.72, 0.32],
+  [14.5, 1.4, 1.38, 0.62],
+  [16.5, 1.02, 0.98, 0.95],
+  [18.3, 0.62, 0.58, 1.22],
+  [19.4, 0.32, 0.3, 1.38],
+  [19.74, 0.12, 0.12, 1.42],
 ];
-
-const BOOT = new THREE.Color('#2a2c30');
-const WHITE = new THREE.Color('#f4f5f7');
 
 interface WingStation {
   x: number;
@@ -80,12 +80,6 @@ function wingSections(stations: WingStation[], side: 1 | -1, f0: number, f1: num
   }));
 }
 
-/** Black pneumatic de-icing boots along the leading edge, as on every ATR. */
-function bootColor(stations: WingStation[], f1: number) {
-  const rings = stations.map((s) => airfoilSlice(s.chord, s.t, 0, f1));
-  return (si: number, ri: number) => (rings[si][ri][0] / stations[si].chord < 0.07 ? BOOT : WHITE);
-}
-
 /** A hinged control surface (flap, aileron, elevator) built around its hinge line. */
 function controlSurface(stations: WingStation[], side: 1 | -1, f0: number, mat: THREE.Material): { pivot: THREE.Group; axis: THREE.Vector3 } {
   const a = stations[0];
@@ -125,17 +119,16 @@ export class AircraftModel {
   /** Fuselage-axis origin. */
   readonly body = new THREE.Group();
 
-  private props: { group: THREE.Group; blades: THREE.Group; disc: THREE.Mesh }[] = [];
+  private fans: THREE.Group[] = [];
   private flaps: { pivot: THREE.Group; axis: THREE.Vector3 }[] = [];
   private ailerons: { pivot: THREE.Group; axis: THREE.Vector3; side: number }[] = [];
   private elevators: { pivot: THREE.Group; axis: THREE.Vector3 }[] = [];
-  private mainGear: THREE.Group[] = [];
+  private mainGear: { group: THREE.Group; side: number }[] = [];
   private noseGear!: THREE.Group;
   private strobes: THREE.Sprite[] = [];
   private beacons: THREE.Sprite[] = [];
   private landingLights: THREE.Sprite[] = [];
-  private cargoDoor!: THREE.Group;
-  private propAngle = 0;
+  private fanAngle = 0;
   private airborne = 0;
 
   constructor() {
@@ -144,8 +137,8 @@ export class AircraftModel {
     this.pivot.rotation.order = 'YXZ';
 
     const fuselageMat = new THREE.MeshStandardMaterial({ map: paintFuselage(), roughness: 0.3, metalness: 0.05 });
-    const whiteMat = new THREE.MeshStandardMaterial({ color: '#f4f5f7', roughness: 0.32, metalness: 0.05, vertexColors: true });
     const plainWhite = new THREE.MeshStandardMaterial({ color: '#f4f5f7', roughness: 0.32, metalness: 0.05 });
+    const wingGrey = new THREE.MeshStandardMaterial({ color: '#cdd2d8', roughness: 0.38, metalness: 0.25 });
     const darkMat = new THREE.MeshStandardMaterial({ color: '#1e2024', roughness: 0.55, metalness: 0.2 });
     const metalMat = new THREE.MeshStandardMaterial({ color: '#b9bec6', roughness: 0.3, metalness: 0.7 });
     const tyreMat = new THREE.MeshStandardMaterial({ color: '#141518', roughness: 0.9 });
@@ -154,108 +147,124 @@ export class AircraftModel {
     const fuselage = loft(
       FUSELAGE.map(([z, rx, ry, cy]) => ({
         center: new THREE.Vector3(0, cy, z),
-        ring: ellipse(rx, ry, 56, 0.06),
+        ring: ellipse(rx, ry, 64, 0.04),
         ax: new THREE.Vector3(1, 0, 0),
         ay: new THREE.Vector3(0, 1, 0),
       })),
-      { uv: (si, ri) => [(FUSELAGE[si][0] - NOSE_Z) / LENGTH, ri / 56] },
+      { uv: (si, ri) => [(FUSELAGE[si][0] - NOSE_Z) / LENGTH, ri / 64] },
     );
     this.addMesh(fuselage, fuselageMat);
+    // Wing-to-body fairing under the centre section.
+    const fairing = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 8.5, 8, 20), plainWhite);
+    fairing.rotation.x = Math.PI / 2;
+    fairing.scale.set(1.45, 1, 0.55);
+    fairing.position.set(0, -1.55, -1.2);
+    fairing.castShadow = true;
+    this.body.add(fairing);
 
-    // ---- wings (high-mounted), flaps and ailerons
+    // ---- wings (low-mounted, swept, with dihedral), flaps, ailerons, blended winglets
     const wing: WingStation[] = [
-      { x: 0, y: 1.55, le: -2.3, chord: 2.6, t: 0.18 },
-      { x: 1.5, y: 1.55, le: -2.3, chord: 2.6, t: 0.18 },
-      { x: 4.1, y: 1.57, le: -2.25, chord: 2.45, t: 0.17 },
-      { x: 9.0, y: 1.78, le: -2.05, chord: 1.95, t: 0.15 },
-      { x: 13.52, y: 1.98, le: -1.8, chord: 1.4, t: 0.13 },
+      { x: 0, y: -1.25, le: -5.3, chord: 7.6, t: 0.15 },
+      { x: 1.9, y: -1.05, le: -5.0, chord: 7.3, t: 0.15 },
+      { x: 6.0, y: -0.62, le: -2.9, chord: 5.4, t: 0.13 },
+      { x: 12.0, y: -0.0, le: 0.16, chord: 3.0, t: 0.11 },
+      { x: 17.16, y: 0.55, le: 2.79, chord: 1.25, t: 0.1 },
     ];
     for (const side of [1, -1] as const) {
-      const main = loft(wingSections(wing, side, 0, 0.74), { capEnd: true, color: bootColor(wing, 0.74) });
-      this.addMesh(main, whiteMat);
-      const flapStations = wing.slice(1, 4);
-      const flap = controlSurface(flapStations, side, 0.74, plainWhite);
+      this.addMesh(loft(wingSections(wing, side, 0, 0.75), { capEnd: true }), wingGrey);
+      const flap = controlSurface(wing.slice(1, 4), side, 0.75, wingGrey);
       this.body.add(flap.pivot);
       this.flaps.push(flap);
-      const ail = controlSurface([wing[3], wing[4]], side, 0.74, plainWhite);
+      const ail = controlSurface([wing[3], wing[4]], side, 0.75, wingGrey);
       this.body.add(ail.pivot);
       this.ailerons.push({ ...ail, side });
 
-      // nacelle + spinner + propeller
-      const x = 4.1 * side;
-      const nacelleProfile: [number, number, number][] = [
-        [-4.42, 0.36, 1.22],
-        [-4.25, 0.5, 1.2],
-        [-3.7, 0.6, 1.2],
-        [-2.4, 0.62, 1.24],
-        [-0.8, 0.6, 1.3],
-        [0.6, 0.5, 1.38],
-        [1.5, 0.3, 1.45],
-        [1.95, 0.06, 1.48],
+      // Blended winglet: the tip section rolls up through 90° to a near-vertical fin.
+      const tip = wing[4];
+      const winglet: Section[] = [0, 0.35, 0.7, 1].map((k) => {
+        const a = (k * Math.PI) / 2 * 0.92;
+        const r = 0.9;
+        const chord = tip.chord * (1 - 0.55 * k);
+        return {
+          center: new THREE.Vector3((tip.x + Math.sin(a) * r * 0.6 + k * 0.4) * side, tip.y + (1 - Math.cos(a)) * r + k * 1.5, tip.le + k * 1.7),
+          ring: airfoilSlice(chord, 0.09, 0, 1),
+          ax: new THREE.Vector3(0, 0, 1),
+          ay: new THREE.Vector3(-Math.sin(a) * side, Math.cos(a), 0),
+        };
+      });
+      this.addMesh(loft(winglet, { capEnd: true }), plainWhite);
+
+      // CFM56-7B: flattened intake, fan, pylon, exhaust cone.
+      const x = 4.9 * side;
+      const cy = -1.75;
+      const nacelleProfile: [number, number][] = [
+        [-6.45, 0.74],
+        [-6.3, 0.86],
+        [-5.9, 0.95],
+        [-4.9, 0.97],
+        [-3.7, 0.93],
+        [-2.7, 0.82],
+        [-2.1, 0.68],
+        [-2.0, 0.56],
+        [-1.1, 0.5],
+        [-0.5, 0.36],
+        [-0.15, 0.12],
       ];
       const nacelle = loft(
-        nacelleProfile.map(([z, r, cy]) => ({
+        nacelleProfile.map(([z, r]) => ({
           center: new THREE.Vector3(x, cy, z),
-          ring: ellipse(r * 0.92, r, 28),
+          ring: ellipse(r * 1.04, r * 0.92, 32, 0.18),
           ax: new THREE.Vector3(1, 0, 0),
           ay: new THREE.Vector3(0, 1, 0),
         })),
-        { capStart: true },
+        { capEnd: true },
       );
       this.addMesh(nacelle, plainWhite);
-      const intake = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.26, 1.0), darkMat);
-      intake.position.set(x, 0.62, -3.6);
-      this.body.add(intake);
-      // exhaust stub
-      const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 12), darkMat);
-      exhaust.rotation.x = Math.PI / 2;
-      exhaust.position.set(x + 0.45 * side, 1.15, -0.4);
-      this.body.add(exhaust);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(0.76, 0.07, 10, 32), metalMat);
+      lip.position.set(x, cy, -6.42);
+      lip.scale.set(1.04, 0.92, 1);
+      this.body.add(lip);
+      const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.0, 4.4), plainWhite);
+      pylon.position.set(x, cy + 1.0, -3.4);
+      pylon.rotation.x = -0.08;
+      pylon.castShadow = true;
+      this.body.add(pylon);
 
-      const prop = new THREE.Group();
-      prop.position.set(x, 1.22, -4.48);
-      const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.37, 0.75, 24), plainWhite);
-      spinner.rotation.x = -Math.PI / 2;
-      spinner.position.z = -0.37;
-      prop.add(spinner);
-      const bladeGeo = new THREE.BoxGeometry(0.2, 1.6, 0.05);
-      bladeGeo.translate(0, 1.1, 0);
-      const blades = new THREE.Group();
-      for (let i = 0; i < 6; i++) {
-        const blade = new THREE.Mesh(bladeGeo, darkMat);
-        blade.rotation.z = (i / 6) * Math.PI * 2;
-        blade.rotateY(0.35);
-        blade.castShadow = true;
-        blades.add(blade);
-      }
-      prop.add(blades);
-      const disc = new THREE.Mesh(
-        new THREE.CircleGeometry(1.97, 48),
-        new THREE.MeshBasicMaterial({ map: paintPropDisc(), transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0 }),
+      const fan = new THREE.Group();
+      fan.position.set(x, cy, -6.1);
+      const face = new THREE.Mesh(
+        new THREE.CircleGeometry(0.76, 40),
+        new THREE.MeshStandardMaterial({ map: paintFanFace(), roughness: 0.5, metalness: 0.6, side: THREE.DoubleSide }),
       );
-      disc.position.z = -0.05;
-      prop.add(disc);
-      this.body.add(prop);
-      this.props.push({ group: prop, blades, disc });
+      fan.add(face);
+      const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.55, 24), new THREE.MeshStandardMaterial({ color: '#2a2d33', roughness: 0.4, metalness: 0.6 }));
+      spinner.rotation.x = -Math.PI / 2;
+      spinner.position.z = -0.27;
+      fan.add(spinner);
+      const swirl = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.12, 3, 1, 0, Math.PI * 0.6), new THREE.MeshBasicMaterial({ color: '#f4f5f7', side: THREE.DoubleSide }));
+      swirl.position.z = -0.555;
+      fan.add(swirl);
+      this.body.add(fan);
+      this.fans.push(fan);
     }
 
-    // ---- tail: fin with dorsal fillet (extruded), T-tail stabiliser and elevators
+    // ---- tail: tall swept fin with dorsal fillet, low-set swept stabilisers with elevators
     const finShape = new THREE.Shape();
     const finPts: [number, number][] = [
-      [5.4, 1.35],
-      [7.6, 1.7],
-      [9.2, 2.35],
-      [11.75, 5.08],
-      [13.35, 5.08],
-      [13.62, 4.7],
-      [13.3, 1.25],
-      [5.4, 1.25],
+      [8.0, 1.95],
+      [11.5, 2.35],
+      [12.9, 3.1],
+      [17.7, 9.3],
+      [19.5, 9.3],
+      [19.65, 8.9],
+      [19.35, 1.5],
+      [8.0, 1.5],
     ];
     finShape.moveTo(-finPts[0][0], finPts[0][1]);
     for (const [z, y] of finPts.slice(1)) finShape.lineTo(-z, y);
-    const finGeo = new THREE.ExtrudeGeometry(finShape, { depth: 0.26, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 });
+    const finGeo = new THREE.ExtrudeGeometry(finShape, { depth: 0.3, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2 });
     finGeo.rotateY(Math.PI / 2);
-    finGeo.translate(-0.13, 0, 0);
+    finGeo.translate(-0.15, 0, 0);
     finGeo.computeBoundingBox();
     {
       const bb = finGeo.boundingBox!;
@@ -269,65 +278,53 @@ export class AircraftModel {
     this.addMesh(finGeo, new THREE.MeshStandardMaterial({ map: paintFin(), roughness: 0.32, metalness: 0.05 }));
 
     const stab: WingStation[] = [
-      { x: 0, y: 5.12, le: 11.85, chord: 1.65, t: 0.11 },
-      { x: 3.65, y: 5.16, le: 12.55, chord: 1.0, t: 0.1 },
+      { x: 0, y: 1.0, le: 14.4, chord: 4.4, t: 0.1 },
+      { x: 7.18, y: 1.9, le: 18.6, chord: 1.3, t: 0.09 },
     ];
     for (const side of [1, -1] as const) {
-      this.addMesh(loft(wingSections(stab, side, 0, 0.68), { capEnd: true, color: bootColor(stab, 0.68) }), whiteMat);
-      this.elevators.push(controlSurface(stab, side, 0.68, plainWhite));
+      this.addMesh(loft(wingSections(stab, side, 0, 0.7), { capEnd: true }), plainWhite);
+      this.elevators.push(controlSurface(stab, side, 0.7, plainWhite));
       this.body.add(this.elevators[this.elevators.length - 1].pivot);
     }
-    // black boot on the fin leading edge
-    const finBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.7, 8), darkMat);
-    finBoot.position.set(0, 3.72, 10.47);
-    finBoot.rotation.x = 0.75;
-    this.body.add(finBoot);
 
-    // ---- sponsons, gear
+    // ---- gear: mains fold inwards into the wing root (no doors), nose gear forwards
+    const wheelY = -AXIS_HEIGHT + 0.57;
     for (const side of [1, -1] as const) {
-      const sponson = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 2.9, 8, 16), plainWhite);
-      sponson.rotation.x = Math.PI / 2;
-      sponson.scale.set(0.62, 1, 0.85);
-      sponson.position.set(1.18 * side, -1.02, 0.9);
-      sponson.castShadow = true;
-      this.body.add(sponson);
-
       const gear = new THREE.Group();
-      gear.position.set(1.42 * side, -1.15, 0.9);
-      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.9, 10), metalMat);
-      strut.position.y = -0.45;
+      gear.position.set(2.86 * side, -1.3, MAIN_Z);
+      const len = -1.3 - wheelY;
+      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, len, 12), metalMat);
+      strut.position.y = -len / 2;
       gear.add(strut);
-      for (const dz of [-0.25, 0.25]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.26, 20), tyreMat);
+      for (const dx of [-0.43, 0.43]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.57, 0.57, 0.42, 22), tyreMat);
         wheel.rotation.z = Math.PI / 2;
-        wheel.position.set(0.05 * side, -0.88, dz);
+        wheel.position.set(dx, -len, 0);
         wheel.castShadow = true;
         gear.add(wheel);
       }
       this.body.add(gear);
-      this.mainGear.push(gear);
+      this.mainGear.push({ group: gear, side });
     }
     this.noseGear = new THREE.Group();
-    this.noseGear.position.set(0, -1.2, -11.0);
-    const noseStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 10), metalMat);
-    noseStrut.position.y = -0.45;
+    this.noseGear.position.set(0, -1.6, -15.0);
+    const noseLen = -1.6 - (-AXIS_HEIGHT + 0.35);
+    const noseStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, noseLen, 10), metalMat);
+    noseStrut.position.y = -noseLen / 2;
     this.noseGear.add(noseStrut);
-    for (const dx of [-0.17, 0.17]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.18, 18), tyreMat);
+    for (const dx of [-0.22, 0.22]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 18), tyreMat);
       wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(dx, -0.95, 0);
+      wheel.position.set(dx, -noseLen, 0);
       wheel.castShadow = true;
       this.noseGear.add(wheel);
     }
     this.body.add(this.noseGear);
-
-    // ---- forward cargo door (left side), opens upwards for unloading
-    this.cargoDoor = new THREE.Group();
-    this.cargoDoor.position.set(-1.43, 1.0, -9.35);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.75, 1.9), plainWhite);
-    door.position.set(-0.02, -0.88, 0);
-    this.cargoDoor.add(door);
-    this.body.add(this.cargoDoor);
+    // APU exhaust at the tail cone tip.
+    const apu = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.3, 12), darkMat);
+    apu.rotation.x = Math.PI / 2;
+    apu.position.set(0, 1.42, 19.78);
+    this.body.add(apu);
 
     // ---- lights
     const glow = glowTexture();
@@ -338,11 +335,11 @@ export class AircraftModel {
       this.body.add(s);
       return s;
     };
-    light('#ff2a2a', [-13.55, 1.98, -1.4], 0.9);
-    light('#2aff6a', [13.55, 1.98, -1.4], 0.9);
-    this.strobes.push(light('#ffffff', [-13.6, 1.98, -0.6], 2.6), light('#ffffff', [13.6, 1.98, -0.6], 2.6), light('#ffffff', [0, 1.3, 13.62], 1.8));
-    this.beacons.push(light('#ff3030', [0, 1.48, 1.5], 1.4), light('#ff3030', [0, -1.42, 0.5], 1.4));
-    this.landingLights.push(light('#fff6dd', [0.0, -1.55, -11.0], 1.6), light('#fff6dd', [1.6, 1.3, -2.4], 1.4), light('#fff6dd', [-1.6, 1.3, -2.4], 1.4));
+    light('#ff2a2a', [-17.3, 0.6, 3.2], 1.0);
+    light('#2aff6a', [17.3, 0.6, 3.2], 1.0);
+    this.strobes.push(light('#ffffff', [-17.4, 0.6, 3.6], 2.8), light('#ffffff', [17.4, 0.6, 3.6], 2.8), light('#ffffff', [0, 1.42, 19.8], 2.0));
+    this.beacons.push(light('#ff3030', [0, 2.05, 1.0], 1.5), light('#ff3030', [0, -2.1, -3.0], 1.5));
+    this.landingLights.push(light('#fff6dd', [0.0, -2.6, -15.0], 1.8), light('#fff6dd', [2.4, -1.15, -4.7], 1.6), light('#fff6dd', [-2.4, -1.15, -4.7], 1.6));
   }
 
   private addMesh(geo: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
@@ -353,12 +350,6 @@ export class AircraftModel {
     return mesh;
   }
 
-  /** Cargo door 0 = closed, 1 = open. */
-  setCargoDoor(open: number): void {
-    this.cargoDoor.rotation.z = -open * 1.6;
-    this.cargoDoor.visible = open > 0.02; // the closed door is painted on the livery
-  }
-
   update(ac: Aircraft, dt: number, time: number, input: { roll: number; pitch: number }): void {
     this.root.position.set(ac.pos.x, ac.pos.y, ac.pos.z);
     this.root.rotation.y = (-ac.heading * Math.PI) / 180;
@@ -366,29 +357,24 @@ export class AircraftModel {
     // Rotate about the main wheels on the ground, about the centre of gravity in the air.
     this.airborne += ((ac.onGround ? 0 : 1) - this.airborne) * Math.min(1, dt * 2);
     const h = this.airborne;
-    this.pivot.position.set(0, AXIS_HEIGHT * h, 0.9 * (1 - h));
-    this.body.position.set(0, AXIS_HEIGHT * (1 - h), -0.9 * (1 - h));
+    this.pivot.position.set(0, AXIS_HEIGHT * h, MAIN_Z * (1 - h));
+    this.body.position.set(0, AXIS_HEIGHT * (1 - h), -MAIN_Z * (1 - h));
     this.pivot.rotation.x = (ac.pitch * Math.PI) / 180;
     this.pivot.rotation.z = (-ac.bank * Math.PI) / 180;
 
-    // Props: spin slower than real so the eye reads the motion, blur disc at speed.
-    this.propAngle += dt * (2 + ac.prop * 30);
-    const discOpacity = THREE.MathUtils.smoothstep(ac.prop, 0.3, 0.75);
-    for (const p of this.props) {
-      p.blades.rotation.z = -this.propAngle;
-      (p.disc.material as THREE.MeshBasicMaterial).opacity = discOpacity * 0.9;
-      p.blades.visible = discOpacity < 0.95;
-    }
+    // Fans: spin slower than real so the eye reads the motion.
+    this.fanAngle += dt * (1.5 + ac.prop * 14);
+    for (const f of this.fans) f.rotation.z = -this.fanAngle;
 
     const flap = (ac.flapAngle * Math.PI) / 180;
-    for (const f of this.flaps) f.pivot.setRotationFromAxisAngle(f.axis, flap);
+    for (const f of this.flaps) f.pivot.setRotationFromAxisAngle(f.axis, flap * 0.8);
     for (const a of this.ailerons) a.pivot.setRotationFromAxisAngle(a.axis, a.side * -input.roll * 0.3);
     for (const e of this.elevators) e.pivot.setRotationFromAxisAngle(e.axis, -input.pitch * 0.35);
 
     const g = ac.gear;
-    for (const m of this.mainGear) {
-      m.rotation.x = (-(1 - g) * Math.PI) / 2;
-      m.visible = g > 0.03;
+    for (const { group, side } of this.mainGear) {
+      group.rotation.z = (-side * (1 - g) * Math.PI) / 2;
+      group.visible = g > 0.03;
     }
     this.noseGear.rotation.x = ((1 - g) * Math.PI) / 2;
     this.noseGear.visible = g > 0.03;

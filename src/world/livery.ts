@@ -15,8 +15,8 @@ const H = 1024;
 
 type Side = 'right' | 'left';
 
-/** Metres per pixel vertically (round the 1.43 m radius) over metres per pixel along the 27.16 m length. */
-const ASPECT = (2 * Math.PI * 1.43) / H / (27.16 / W);
+/** Metres per pixel vertically (round the ~1.94 m radius) over metres per pixel along the 39.47 m length. */
+const ASPECT = (2 * Math.PI * 1.94) / H / (39.47 / W);
 
 /** Canvas y for a height h (0 = belly line, 1 = crown) on a given side. */
 function sideY(side: Side, h: number): number {
@@ -106,8 +106,9 @@ export function paintFuselage(): THREE.CanvasTexture {
     ctx.save();
     ctx.fillStyle = '#20252d';
     for (const [u0, u1, h0, h1] of [
-      [0.052, 0.075, 0.6, 0.78],
-      [0.077, 0.098, 0.62, 0.8],
+      [0.036, 0.05, 0.6, 0.76],
+      [0.052, 0.064, 0.62, 0.78],
+      [0.066, 0.075, 0.66, 0.78],
     ]) {
       const y0 = sideY(side, h0);
       const y1 = sideY(side, h1);
@@ -122,31 +123,37 @@ export function paintFuselage(): THREE.CanvasTexture {
     ctx.restore();
 
     // Titles.
-    sideText(ctx, side, 'AirBorneo', 0.3, 0.7, 120, brand.fonts.ui, c.ink, 800);
-    sideText(ctx, side, 'CONNECTING YOU', 0.62, 0.68, 34, brand.fonts.ui, c.red, 800);
-    sideText(ctx, side, brand.tagline.toUpperCase(), 0.3, 0.33, 34, brand.fonts.ui, c.slate, 700);
+    sideText(ctx, side, 'AirBorneo', 0.3, 0.74, 110, brand.fonts.ui, c.ink, 800);
+    sideText(ctx, side, 'CONNECTING YOU', 0.62, 0.72, 30, brand.fonts.ui, c.red, 800);
+    sideText(ctx, side, brand.tagline.toUpperCase(), 0.3, 0.36, 30, brand.fonts.ui, c.slate, 700);
 
-    // Passenger windows along the cabin.
+    // Passenger windows along the cabin (0.51 m pitch), with the two overwing exits.
     ctx.fillStyle = '#2a3340';
-    for (let u = 0.135; u < 0.72; u += 0.0215) {
-      if (u > 0.265 && u < 0.29) continue; // over the wing root emergency exit spacing
-      const y0 = sideY(side, 0.43);
-      const y1 = sideY(side, 0.53);
+    const pitch = 0.51 / 39.47;
+    for (let u = 0.125; u < 0.79; u += pitch) {
+      if (u > 0.435 && u < 0.468) continue; // overwing exits
+      const y0 = sideY(side, 0.5);
+      const y1 = sideY(side, 0.58);
       ctx.beginPath();
-      ctx.roundRect(u * W, Math.min(y0, y1), 17, Math.abs(y1 - y0), 6);
+      ctx.roundRect(u * W, Math.min(y0, y1), 11, Math.abs(y1 - y0), 5);
       ctx.fill();
     }
   }
 
-  // Forward passenger door (left side) outline.
+  // Door outlines: forward and aft passenger doors (left), galley service doors (right), overwing exits.
   ctx.strokeStyle = 'rgba(17,18,22,0.35)';
   ctx.lineWidth = 3;
-  const d0 = sideY('left', 0.08);
-  const d1 = sideY('left', 0.6);
-  ctx.strokeRect(W * 0.105, Math.min(d0, d1), W * 0.032, Math.abs(d1 - d0));
-  // Passenger door outline (rear left) and service door (rear right).
-  ctx.strokeRect(W * 0.735, Math.min(sideY('left', 0.1), sideY('left', 0.6)), W * 0.028, Math.abs(sideY('left', 0.6) - sideY('left', 0.1)));
-  ctx.strokeRect(W * 0.735, Math.min(sideY('right', 0.1), sideY('right', 0.6)), W * 0.028, Math.abs(sideY('right', 0.6) - sideY('right', 0.1)));
+  const door = (side: Side, u: number, w: number, h0: number, h1: number) => {
+    const y0 = sideY(side, h0);
+    const y1 = sideY(side, h1);
+    ctx.strokeRect(W * u, Math.min(y0, y1), W * w, Math.abs(y1 - y0));
+  };
+  for (const side of ['left', 'right'] as Side[]) {
+    door(side, 0.09, 0.022, 0.18, 0.66);
+    door(side, 0.8, 0.02, 0.2, 0.64);
+    door(side, 0.438, 0.012, 0.4, 0.62);
+    door(side, 0.453, 0.012, 0.4, 0.62);
+  }
 
   // Windscreen panels across the crown at the nose.
   ctx.fillStyle = '#20252d';
@@ -218,21 +225,29 @@ export function paintFin(): THREE.CanvasTexture {
   return tex;
 }
 
-/** Soft radial disc used for spinning propellers. */
-export function paintPropDisc(): THREE.CanvasTexture {
+/** The CFM56 fan face: 24 wide-chord titanium blades round a dark hub. */
+export function paintFanFace(): THREE.CanvasTexture {
   const S = 256;
   const canvas = document.createElement('canvas');
   canvas.width = S;
   canvas.height = S;
   const ctx = canvas.getContext('2d')!;
-  const g = ctx.createRadialGradient(S / 2, S / 2, S * 0.08, S / 2, S / 2, S / 2);
-  g.addColorStop(0, 'rgba(30,32,36,0.0)');
-  g.addColorStop(0.2, 'rgba(30,32,36,0.35)');
-  g.addColorStop(0.85, 'rgba(30,32,36,0.22)');
-  g.addColorStop(0.95, 'rgba(255,198,41,0.35)');
-  g.addColorStop(1, 'rgba(30,32,36,0)');
-  ctx.fillStyle = g;
+  ctx.fillStyle = '#1b1d21';
   ctx.fillRect(0, 0, S, S);
+  ctx.translate(S / 2, S / 2);
+  for (let i = 0; i < 24; i++) {
+    ctx.rotate((Math.PI * 2) / 24);
+    const g = ctx.createLinearGradient(0, 0, S / 2, 0);
+    g.addColorStop(0, '#5d636c');
+    g.addColorStop(1, '#a7adb6');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(S * 0.08, -2);
+    ctx.quadraticCurveTo(S * 0.3, -9, S / 2, -5);
+    ctx.lineTo(S / 2, 3);
+    ctx.quadraticCurveTo(S * 0.3, -1, S * 0.08, 3);
+    ctx.fill();
+  }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

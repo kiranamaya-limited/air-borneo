@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="AirBorneo · Coming Home: fly 68 passengers home from Kuala Lumpur to Kuching with your phone as the yoke, and keep them comfortable." />
+    <meta name="description" content="AirBorneo · Coming Home: fly 162 passengers home from Kuala Lumpur to Kuching with your phone as the yoke, and keep them comfortable." />
     <title>AirBorneo Coming Home</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -32,14 +32,18 @@
           <span class="mono" id="hud-flight">AB 101 · KUL → KCH</span>
           <span class="stage" id="hud-stage">GROUND</span>
         </div>
-        <canvas id="heading-tape" width="440" height="48"></canvas>
-        <div class="score-card ab-card">
-          <div class="score-row">
-            <span class="ab-eyebrow">Passenger comfort</span>
-            <span class="comfort-face" id="hud-face"></span>
+        <div class="top-centre">
+          <div class="comfort-hero ab-card" id="comfort-hero">
+            <div class="comfort-head">
+              <span class="comfort-face" id="hud-face"></span>
+              <span class="ab-eyebrow">Passenger comfort</span>
+              <span class="score-value mono" id="hud-comfort">100%</span>
+            </div>
+            <div class="meter comfort-meter"><div class="meter-fill" id="hud-comfort-bar"></div></div>
           </div>
-          <div class="score-value mono" id="hud-comfort">100%</div>
-          <div class="meter"><div class="meter-fill" id="hud-comfort-bar"></div></div>
+          <canvas id="heading-tape" width="440" height="48"></canvas>
+        </div>
+        <div class="score-card ab-card">
           <div class="score-row small">
             <span>On the line</span>
             <span class="mono" id="hud-dev">–</span>
@@ -67,11 +71,11 @@
       <div id="popups" class="popups"></div>
 
       <div class="hud-bottom">
-        <!-- The cabin: 68 passengers, a few of them shown, with their reactions. -->
+        <!-- The cabin: 162 passengers, a few of them shown, with their reactions. -->
         <div class="cabin ab-card" id="cabin">
           <div class="cabin-head">
-            <span class="ab-eyebrow">Cabin · 68 on board</span>
-            <span class="cabin-happy mono" id="cabin-happy">68 happy</span>
+            <span class="ab-eyebrow">Cabin · 162 on board</span>
+            <span class="cabin-happy mono" id="cabin-happy">162 happy</span>
           </div>
           <div class="cabin-seats" id="cabin-seats"></div>
           <div class="cabin-bubble" id="cabin-bubble"></div>
@@ -106,11 +110,11 @@
         </div>
         <span class="ab-stripe"></span>
         <h1>Coming Home</h1>
-        <p class="lead">68 Sarawakians are flying home from Kuala Lumpur: students back for the holidays, families back for Gawai, a grandmother who has waited all year. Fly AirBorneo flight 101 from KL to Kuching and <b>keep them comfortable</b>: gentle turns, steady through the storm, and a butter-smooth landing. Yank the yoke and you’ll hear about it…</p>
+        <p class="lead">162 Sarawakians are flying home from Kuala Lumpur: students back for the holidays, families back for Gawai, a grandmother who has waited all year. Fly AirBorneo flight 101 from KL to Kuching and <b>keep them comfortable</b>: gentle turns, steady through the storm, and a butter-smooth landing. Yank the yoke and you’ll hear about it…</p>
         <div class="brief">
           <div><span class="ab-eyebrow">Route</span><b class="mono">KUL → KCH</b></div>
           <div><span class="ab-eyebrow">Distance</span><b class="mono">523 NM</b></div>
-          <div><span class="ab-eyebrow">Passengers</span><b class="mono">68 · ATR 72</b></div>
+          <div><span class="ab-eyebrow">Passengers</span><b class="mono">162 · B737-800</b></div>
           <div><span class="ab-eyebrow">Runways</span><b class="mono">32R → 25</b></div>
         </div>
         <ol class="how">
