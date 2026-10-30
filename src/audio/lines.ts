@@ -9,6 +9,8 @@ export interface VoiceLine {
   id: string;
   kind: VoiceKind;
   text: string;
+  /** Phonetic respelling for the voice generator (Malay and local names); the game shows `text`. */
+  say?: string;
 }
 
 export const VOICE_LINES = lines as VoiceLine[];

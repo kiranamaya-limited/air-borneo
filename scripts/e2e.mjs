@@ -97,6 +97,9 @@ try {
   await phone.click('#calibrate-btn');
   await screen.waitForFunction(() => window.__game.mission.phase === 'lineup', null, { timeout: 30000 });
   check(true, 'calibrating puts you straight on the runway (no cutscene)');
+  await screen.waitForFunction(() => window.__game.audio.clipsPlayed > 0, null, { timeout: 20000 }).catch(() => {});
+  const voice = await screen.evaluate(() => window.__game.audio);
+  check(voice.voices === 24 && voice.clipsPlayed > 0, `captain's recorded voice loads and plays (${voice.voices} clips, ${voice.clipsPlayed} played)`);
   check(await screen.evaluate(() => !document.getElementById('sound-btn')), 'no "Click for sound" button');
 
   await phone.click('#flaps-btn', { force: true }); // it pulses while it's the next action

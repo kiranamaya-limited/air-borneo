@@ -5,13 +5,15 @@ Record the crew's lines as voice clips with Piper, an open-source neural text-to
     pip install piper-tts
     python3 scripts/voices.py            # writes public/voice/<id>.mp3 and public/voice/index.json
 
-Reads src/audio/lines.json (the same list the game uses). The captain's cabin announcements use a
-calm, deep British male voice; the cockpit callouts a crisper one. Needs ffmpeg and internet access
-to huggingface.co the first time (the voice models are cached in ~/.cache/piper-voices).
+Reads src/audio/lines.json (the same list the game uses); a line's optional "say" field is a
+phonetic respelling sent to the voice instead of "text" (for Malay and local names). The captain's
+announcements use Piper's "Ryan" (high quality); the first officer's cockpit callouts use "Alan".
+Needs ffmpeg, and GitHub access the first time (voices are cached in ~/.cache/piper-voices).
 """
 import json
 import subprocess
 import sys
+import tarfile
 import tempfile
 import urllib.request
 import wave
@@ -21,25 +23,26 @@ ROOT = Path(__file__).resolve().parent.parent
 LINES = ROOT / "src" / "audio" / "lines.json"
 OUT = ROOT / "public" / "voice"
 CACHE = Path.home() / ".cache" / "piper-voices"
-BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+RELEASE = "https://github.com/rhasspy/piper/releases/download/v0.0.2"
 
-# kind -> (voice, speaking rate: >1 is slower, sentence pause in seconds)
+# kind -> (voice, speaking rate: >1 is slower, pause after the line in seconds)
 VOICES = {
-    "pa": ("en/en_GB/alan/medium/en_GB-alan-medium", 1.12, 0.45),
-    "callout": ("en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium", 0.95, 0.2),
+    "pa": ("en-us-ryan-high", 1.1, 0.45),
+    "callout": ("en-gb-alan-low", 0.95, 0.15),
 }
 
 
-def model(path: str) -> Path:
-    """Download a Piper voice (model + config) once."""
+def model(name: str) -> Path:
+    """Download and unpack a Piper voice (model + config) once."""
     CACHE.mkdir(parents=True, exist_ok=True)
-    name = path.rsplit("/", 1)[-1]
     onnx = CACHE / f"{name}.onnx"
-    for suffix in (".onnx", ".onnx.json"):
-        target = CACHE / f"{name}{suffix}"
-        if not target.exists():
-            print(f"  downloading {name}{suffix}")
-            urllib.request.urlretrieve(f"{BASE}/{path}{suffix}", target)
+    if not onnx.exists() or not (CACHE / f"{name}.onnx.json").exists():
+        print(f"  downloading {name}")
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "voice.tar.gz"
+            urllib.request.urlretrieve(f"{RELEASE}/voice-{name}.tar.gz", archive)
+            with tarfile.open(archive) as tar:
+                tar.extractall(CACHE, filter="data")
     return onnx
 
 
@@ -55,7 +58,7 @@ def main() -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wav = Path(tmp) / "line.wav"
             with wave.open(str(wav), "wb") as w:
-                voice.synthesize_wav(line["text"], w, syn_config=SynthesisConfig(length_scale=rate, noise_scale=0.6, noise_w_scale=0.7))
+                voice.synthesize_wav(line.get("say", line["text"]), w, syn_config=SynthesisConfig(length_scale=rate, noise_scale=0.6, noise_w_scale=0.7))
             mp3 = OUT / f"{line['id']}.mp3"
             # Trim silence, add a short sentence breath, normalise loudness, mono 64 kbps.
             subprocess.run(
