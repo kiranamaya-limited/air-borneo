@@ -71,6 +71,8 @@ export class Mission {
   phaseTime = 0;
   time = 0;
   prompt = '';
+  /** The everyday cruise hint (the HUD retires it once the player has got going). */
+  readonly steerHint = 'Follow the dotted line, nice and smooth';
   want: Want = 'none';
   alert: Alert | undefined;
   stage = 'GROUND';
@@ -181,7 +183,7 @@ export class Mission {
     this.stage = `RWY ${Mission.depRunway}`;
     this.ac.prop = 0.4;
     this.want = this.ac.flaps === 15 ? 'throttle-up' : 'flaps';
-    this.prompt = this.ac.flaps === 15 ? 'Push the throttle to TO' : 'Flaps 15, then throttle to TO';
+    this.prompt = this.ac.flaps === 15 ? 'Full throttle to take off' : 'Flaps down, then full throttle';
     if (input.throttle > 0.85) {
       // Forgot the flaps? The first officer sets them; a soft chime, no hold-up.
       if (this.ac.flaps !== 15) {
@@ -206,10 +208,10 @@ export class Mission {
     if (kt >= VR_KT) this.say('vr', { type: 'callout', text: 'ROTATE', speak: 'Rotate' });
     if (kt >= VR_KT) {
       this.want = 'pitch-up';
-      this.prompt = 'ROTATE · nose up gently';
+      this.prompt = 'Rotate! Ease the nose up';
     } else {
       this.want = input.throttle < 0.85 ? 'throttle-up' : 'none';
-      this.prompt = input.throttle < 0.85 ? 'Keep the throttle at TO' : 'Accelerating… wait for ROTATE';
+      this.prompt = input.throttle < 0.85 ? 'Keep the throttle up' : 'Building speed…';
     }
     for (const e of events) {
       if (e === 'tailstrike') {
@@ -373,29 +375,29 @@ export class Mission {
     }
 
     // Prompts: comfort first.
-    let prompt = 'Fly the dotted line · keep it smooth';
+    let prompt = this.steerHint;
     let want: Want = 'steer';
-    if (Math.abs(ac.bank) > 27) prompt = 'Gentle! Ease the bank for the passengers';
-    else if (this.wx.turb > 0.5) prompt = 'Rough air · small, smooth inputs';
+    if (Math.abs(ac.bank) > 27) prompt = 'Too steep! Level the wings gently';
+    else if (this.wx.turb > 0.5) prompt = 'Bumpy air · tiny, gentle moves';
     if (s > st['base'] && ac.flaps !== 30 && s < st['final'] + 700) {
-      prompt = 'Approach: set FLAPS 30';
+      prompt = 'Flaps down for landing';
       want = 'flaps';
-    } else if (s > st['final']) prompt = 'Follow the glide path · 3°';
+    } else if (s > st['final']) prompt = 'Follow the dots down to the runway';
     if (landing && agl < 12) {
-      prompt = 'FLARE · nose up gently';
+      prompt = 'Flare! Ease the nose up';
       want = 'pitch-up';
       if (this.phase !== 'flare') this.setPhase('flare');
     }
 
     // Warnings override weather alerts.
     let alert = this.wx.alert;
-    if (!landing && agl < 70 && ac.vs < -2 && s > st['climb:end']) alert = { id: 'terrain', text: 'TERRAIN · PULL UP', level: 'warning' };
+    if (!landing && agl < 70 && ac.vs < -2 && s > st['climb:end']) alert = { id: 'terrain', text: 'Too low! Pull up', level: 'warning' };
     if (this.track.dist > 220) {
       this.offCourseTime += dt;
-      alert = { id: 'offcourse', text: 'OFF COURSE · return to the dotted line', level: 'warning' };
-      prompt = 'Steer back to the dotted line';
+      alert = { id: 'offcourse', text: 'Off course! Back to the dotted line', level: 'warning' };
+      prompt = 'Back to the dotted line!';
     } else this.offCourseTime = 0;
-    if (ac.stallWarning) alert = { id: 'stall', text: 'STALL', level: 'warning' };
+    if (ac.stallWarning) alert = { id: 'stall', text: 'Too slow! Lower the nose', level: 'warning' };
     this.setAlert(alert);
     this.prompt = prompt;
     this.want = want;
@@ -427,7 +429,7 @@ export class Mission {
     this.throttleHighTime = idle ? 0 : this.throttleHighTime + dt;
     const throttle = idle || this.throttleHighTime > 3 ? 0 : input.throttle;
     ac.step(dt, { roll: 0, pitch: 0, throttle }, CALM, { targetSpeed: 0, trimGamma: 0, groundY: 0, landing: true, runway: this.kchRunway() });
-    this.prompt = idle ? 'Braking · welcome home to Kuching' : 'Throttle to IDLE';
+    this.prompt = idle ? 'Welcome home to Kuching!' : 'Throttle back to idle';
     this.want = idle ? 'none' : 'throttle-idle';
     if (ac.speed < 18) {
       this.say('atc-ground', { type: 'atc', text: 'AirBorneo 101, welcome home. Thanks for bringing them back safely.' });

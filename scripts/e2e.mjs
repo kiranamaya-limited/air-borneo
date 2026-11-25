@@ -128,6 +128,20 @@ try {
   check(true, 'pitch starts inverted: tilting forward is nose up');
   await screen.waitForFunction(() => window.__game.mission.phase === 'flight', null, { timeout: 60000 });
   check(true, 'tilting forward at Vr rotates and lifts off');
+  const hudState = await screen.evaluate(() => {
+    const visible = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+    return {
+      game: ['comfort-hero', 'hud-score', 'steady-arc', 'hud-plane'].every(visible) && !!document.querySelector('#hud-face svg'),
+      sim: ['speed-tape', 'alt-tape', 'heading-tape', 'hud-flaps', 'hud-wind', 'hud-stage'].filter((id) => document.getElementById(id)),
+    };
+  });
+  check(hudState.game, 'HUD shows the comfort meter, score, journey and steady arc');
+  check(hudState.sim.length === 0, `no simulator instruments on the HUD (${hudState.sim.join(', ') || 'none'})`);
   await setTilt(phone, 0, 0);
   await screen.screenshot({ path: `${SHOTS}/04-climb.png` });
 
@@ -174,8 +188,6 @@ try {
   check(/★/.test(stars ?? ''), `results show a star rating (${stars})`);
   const note = await screen.textContent('#res-note');
   check(/passengers had a lovely flight/.test(note ?? ''), `results talk about the passengers (${note?.slice(0, 60)}…)`);
-  const seats = await screen.evaluate(() => document.querySelectorAll('#cabin-seats span').length);
-  check(seats === 10, 'cabin panel shows the passengers');
   await phone.waitForFunction(() => /★|☆/.test(document.getElementById('prompt').textContent), null, { timeout: 15000 });
   check(true, 'phone receives the result');
   await phone.screenshot({ path: `${SHOTS}/08-phone-result.png` });

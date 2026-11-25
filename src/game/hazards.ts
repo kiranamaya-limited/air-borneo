@@ -121,7 +121,7 @@ export class WeatherSystem {
       windFrom = 310;
       windKt = Math.round(24 * xw + 8 * (1 - xw));
       gustKt = Math.round((24 + gust * KT) * xw);
-      if (xw > 0.3) alert = { id: 'xwind', text: `CROSSWIND  310° / ${windKt} KT  G${gustKt}`, level: 'caution' };
+      if (xw > 0.3) alert = { id: 'xwind', text: 'Gusty crosswind · hold the line', level: 'caution' };
     }
 
     // 2. Convective up/downdrafts over the Titiwangsa hills.
@@ -129,7 +129,7 @@ export class WeatherSystem {
     if (th > 0) {
       wy += Math.sin(s / 260 + this.thermalPhase) * 3.2 * th;
       turb = Math.max(turb, 0.36 * th);
-      if (!alert) alert = { id: 'thermals', text: 'CONVECTIVE UP & DOWNDRAFTS', level: 'caution' };
+      if (!alert) alert = { id: 'thermals', text: 'Bumpy air over the hills', level: 'caution' };
     }
 
     // 2b. Sea-breeze gusts off the east coast, from the north-west.
@@ -144,7 +144,7 @@ export class WeatherSystem {
       windFrom = 315;
       windKt = Math.round(16 * sb + 8 * (1 - sb));
       gustKt = Math.round((16 + gust * KT) * sb);
-      if (sb > 0.3) alert = { id: 'seabreeze', text: `SEA BREEZE GUSTS  315° / ${windKt} KT  G${gustKt}`, level: 'caution' };
+      if (sb > 0.3) alert = { id: 'seabreeze', text: 'Sea-breeze gusts · stay gentle', level: 'caution' };
     }
 
     // 3. Cumulonimbus: turbulence, inflow towards the core, rain, lightning.
@@ -163,7 +163,7 @@ export class WeatherSystem {
         lightning = true;
         this.nextLightning = t + 1.2 + this.rand() * 3.5;
       }
-      if (!alert || near > 0.3) alert = { id: 'storm', text: 'CB CELL: SEVERE TURBULENCE, STAY ON TRACK', level: near > 0.55 ? 'warning' : 'caution' };
+      if (!alert || near > 0.3) alert = { id: 'storm', text: near > 0.55 ? 'Storm! Hold it steady' : 'Storm ahead · stay on the dotted line', level: near > 0.55 ? 'warning' : 'caution' };
     }
 
     // 4. Squall line off Borneo: strong south-westerly with heavy rain, clearing at the coast.
@@ -179,19 +179,19 @@ export class WeatherSystem {
       windFrom = 220;
       windKt = Math.round(26 * sq + 8 * (1 - sq));
       gustKt = Math.round((26 + gust * KT) * sq);
-      if (sq > 0.3) alert = { id: 'squall', text: `SQUALL LINE  220° / ${windKt} KT  G${gustKt}`, level: 'caution' };
+      if (sq > 0.3) alert = { id: 'squall', text: 'Rain squall · gentle hands', level: 'caution' };
     }
 
     // 5. Microburst on short final: brief updraft, then a strong sink.
     const fs = st['final'];
     const wsA = fs + 450;
     const wsB = fs + 950;
-    if (s > wsA - 350 && s < wsA) alert = { id: 'ws-ahead', text: 'WINDSHEAR AHEAD', level: 'caution' };
+    if (s > wsA - 350 && s < wsA) alert = { id: 'ws-ahead', text: 'Windshear ahead', level: 'caution' };
     if (s >= wsA && s <= wsB) {
       const k = (s - wsA) / (wsB - wsA);
       wy += k < 0.3 ? 2.2 * Math.sin((k / 0.3) * Math.PI) : -4 * Math.sin(((k - 0.3) / 0.7) * Math.PI);
       turb = Math.max(turb, 0.35);
-      alert = { id: 'windshear', text: 'WINDSHEAR', level: 'warning' };
+      alert = { id: 'windshear', text: 'Windshear! Keep the nose up', level: 'warning' };
     }
 
     const rollAmp = 1.5 + turb * 7;

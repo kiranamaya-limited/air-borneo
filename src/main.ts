@@ -48,7 +48,7 @@ async function boot(): Promise<void> {
   const mission = new Mission(seedParam ? Number(seedParam) : undefined);
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
   const world = new World(canvas, mission, params.get('quality') === 'low' ? 'low' : 'high');
-  const hud = new Hud(mission);
+  const hud = new Hud();
   const screens = new Screens();
   const audio = new GameAudio();
   // Start the lounge music straight away where autoplay is allowed (the installed app, the demo
@@ -211,11 +211,9 @@ async function boot(): Promise<void> {
         audio.chime(e.grade);
         break;
       case 'callout':
-        hud.showCallout(e.text);
         audio.speak(e.speak ?? e.text, 'callout');
         break;
       case 'atc':
-        hud.showAtc(e.text);
         audio.squelch();
         break;
       case 'alert':
@@ -245,7 +243,7 @@ async function boot(): Promise<void> {
         hud.cabin.tell(e.text);
         break;
       case 'pa':
-        hud.showAtc(e.text, 'Captain · cabin announcement');
+        hud.subtitle(e.text, 'Captain:');
         audio.speak(e.text, 'pa');
         break;
       case 'chime':

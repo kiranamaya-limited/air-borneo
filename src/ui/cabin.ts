@@ -1,6 +1,5 @@
-/** The cabin panel: a row of passengers whose faces follow comfort, plus their reactions. */
+/** Passenger faces and reactions for the HUD's comfort meter. */
 import type { Reaction } from '../game/comfort';
-import { PASSENGERS } from '../game/comfort';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -60,74 +59,40 @@ export function comfortMood(c: number): Mood {
   return c > 90 ? 'happy' : c > 78 ? 'content' : c > 62 ? 'neutral' : c > 45 ? 'worried' : c > 30 ? 'upset' : 'queasy';
 }
 
+/**
+ * The cabin's voice on the HUD: a speech bubble under the comfort meter when passengers react, and
+ * the reaction's face shown on the meter for a moment. Passenger stories go to the subtitle line.
+ */
 export class Cabin {
-  private readonly seats: HTMLSpanElement[] = [];
-  private readonly shown: Mood[] = [];
-  private readonly sensitivity: number[] = [];
-  private readonly override: { mood: Mood; until: number }[] = [];
   private readonly bubble = $('cabin-bubble');
-  private readonly story = $('cabin-story');
-  private readonly happy = $('cabin-happy');
   private bubbleTimer = 0;
-  private storyTimer = 0;
+  private reaction: { mood: Mood; until: number } | null = null;
 
-  constructor(count = 10) {
-    const row = $('cabin-seats');
-    row.innerHTML = '';
-    for (let i = 0; i < count; i++) {
-      const s = document.createElement('span');
-      s.innerHTML = faceSvg('happy');
-      row.appendChild(s);
-      this.seats.push(s);
-      this.shown.push('happy');
-      // Some passengers are braver than others.
-      this.sensitivity.push(((i * 7) % count) * 2.4 - count);
-      this.override.push({ mood: 'happy', until: 0 });
-    }
-  }
+  constructor(private readonly onStory: (text: string) => void) {}
 
   reset(): void {
-    for (const o of this.override) o.until = 0;
+    this.reaction = null;
     this.bubble.classList.remove('show');
-    this.story.textContent = '';
   }
 
-  update(comfort: number, sickBags: number): void {
-    const now = performance.now();
-    this.seats.forEach((s, i) => {
-      const o = this.override[i];
-      const mood = o.until > now ? o.mood : comfortMood(comfort + this.sensitivity[i]);
-      if (this.shown[i] !== mood) {
-        this.shown[i] = mood;
-        s.innerHTML = faceSvg(mood);
-      }
-    });
-    const happy = Math.max(0, Math.round(PASSENGERS * (comfort / 100) ** 1.5) - sickBags);
-    const text = `${happy} happy${sickBags ? ` · ${sickBags} sick ${sickBags === 1 ? 'bag' : 'bags'}` : ''}`;
-    if (this.happy.textContent !== text) this.happy.textContent = text;
+  /** The face to show on the comfort meter right now, if a reaction is still playing. */
+  get reactionMood(): Mood | null {
+    return this.reaction && this.reaction.until > performance.now() ? this.reaction.mood : null;
   }
 
   react(kind: Reaction, text: string): void {
-    const now = performance.now();
-    const n = kind === 'scream' || kind === 'applause' || kind === 'lightning' ? 5 : kind === 'happy' ? 2 : 1 + Math.floor(Math.random() * 2);
-    for (let k = 0; k < n; k++) {
-      const i = Math.floor(Math.random() * this.seats.length);
-      this.override[i] = { mood: REACTION_MOOD[kind], until: now + 2200 };
-      const seat = this.seats[i];
-      seat.classList.remove('react');
-      void seat.offsetWidth;
-      seat.classList.add('react');
-    }
+    this.reaction = { mood: REACTION_MOOD[kind], until: performance.now() + 1800 };
     this.bubble.textContent = text;
-    this.bubble.classList.toggle('bad', kind === 'scream' || kind === 'vomit');
+    this.bubble.classList.toggle('bad', kind === 'scream' || kind === 'vomit' || kind === 'lightning');
+    this.bubble.classList.toggle('good', kind === 'happy' || kind === 'applause');
+    this.bubble.classList.remove('show');
+    void this.bubble.offsetWidth;
     this.bubble.classList.add('show');
     window.clearTimeout(this.bubbleTimer);
     this.bubbleTimer = window.setTimeout(() => this.bubble.classList.remove('show'), 2200);
   }
 
   tell(text: string): void {
-    this.story.textContent = text;
-    window.clearTimeout(this.storyTimer);
-    this.storyTimer = window.setTimeout(() => (this.story.textContent = ''), 9000);
+    this.onStory(text);
   }
 }

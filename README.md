@@ -19,6 +19,7 @@ A three.js flying game for AirBorneo. **162 Sarawakians are flying home** from K
   6. home: the Sarawak coast past Mount Santubong, up the Sarawak River over Kuching and the golden-roofed State Assembly,
   7. windshear on short final.
 - **Land on Kuching runway 25:** set flaps 30, follow the 3° glide path (the PAPI and approach lights work), flare gently and pull the throttle to idle.
+- **A clean, game-style screen:** passenger comfort is the big meter at the top, with the journey bar and your points beside it. One message banner tells you the single thing that matters now, and the passengers' reactions pop out under the meter. Under the aircraft, the **steady arc** shows your bank against what the cabin finds comfortable: green, then amber, then red. It flashes when you roll too fast, and its dot rises and sinks with how hard you pull or push. The captain's announcements and passenger stories appear as subtitles.
 - **Results:** stars from passenger comfort and the landing, ranked Trainee → First Officer → Captain → Senior Captain → **Smooth Operator**. They also show how many passengers had a lovely flight, how many needed sick bags, and the biggest complaint.
 
 **Sound:** a synthesised bossa-nova lounge loop, wind gusts, rain, thunder, cabin chimes, the captain's PA, and passenger voices made with formant synthesis. No audio files.
