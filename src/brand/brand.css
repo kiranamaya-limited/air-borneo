@@ -1,0 +1,123 @@
+/* AirBorneo design language: clean white surfaces, Sarawak red / yellow / black accents.
+   Keep in sync with src/brand/tokens.ts. */
+@import url('https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --ab-white: #ffffff;
+  --ab-cloud: #f4f5f7;
+  --ab-mist: #e6e8ec;
+  --ab-slate: #5b6270;
+  --ab-ink: #111216;
+  --ab-red: #d21f2c;
+  --ab-yellow: #ffc629;
+  --ab-black: #111216;
+  --ab-good: #1fa463;
+  --ab-sea: #0b5c7a;
+
+  --ab-font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ab-font-instrument: 'B612 Mono', 'B612', ui-monospace, monospace;
+
+  --ab-radius: 18px;
+  --ab-radius-sm: 10px;
+  --ab-shadow: 0 18px 48px rgba(17, 18, 22, 0.18);
+  --ab-glass: rgba(255, 255, 255, 0.86);
+  --ab-glass-dark: rgba(17, 18, 22, 0.62);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--ab-font);
+  color: var(--ab-ink);
+  background: var(--ab-white);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The Sarawak-flag stripe motif used across the brand. */
+.ab-stripe {
+  display: block;
+  height: 6px;
+  border-radius: 6px;
+  background: linear-gradient(90deg,
+    var(--ab-yellow) 0 33.3%,
+    var(--ab-red) 33.3% 66.6%,
+    var(--ab-black) 66.6% 100%);
+}
+
+.ab-wordmark {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ab-wordmark .ab-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, var(--ab-yellow) 0 38%, var(--ab-red) 38% 64%, var(--ab-black) 64% 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+.ab-wordmark b { color: var(--ab-red); font-weight: 800; }
+
+.ab-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 26px;
+  font: 700 16px/1 var(--ab-font);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  background: var(--ab-red);
+  color: var(--ab-white);
+  box-shadow: 0 8px 20px rgba(210, 31, 44, 0.32);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  touch-action: manipulation;
+}
+.ab-btn:hover { transform: translateY(-1px); }
+.ab-btn:active { transform: translateY(1px) scale(0.98); }
+.ab-btn.secondary {
+  background: var(--ab-white);
+  color: var(--ab-ink);
+  box-shadow: inset 0 0 0 2px var(--ab-mist);
+}
+.ab-btn.dark { background: var(--ab-ink); box-shadow: none; }
+.ab-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+.ab-card {
+  background: var(--ab-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: var(--ab-radius);
+  box-shadow: var(--ab-shadow);
+}
+
+.ab-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ab-slate);
+}
+
+.ab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--ab-cloud);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ab-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ab-slate); }
+.ab-chip.ok .dot { background: var(--ab-good); }
+.ab-chip.warn .dot { background: var(--ab-yellow); }
+.ab-chip.bad .dot { background: var(--ab-red); }
+
+.hidden { display: none !important; }

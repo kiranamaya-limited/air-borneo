@@ -1,0 +1,33 @@
+{
+  "name": "airborneo-desktop",
+  "productName": "AirBorneo Coming Home",
+  "version": "0.1.0",
+  "description": "Offline Mac app for the AirBorneo Coming Home demo.",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "prepare-app": "npm --prefix .. run build:offline && node copy.mjs",
+    "start": "npm run prepare-app && electron .",
+    "dist": "npm run prepare-app && electron-builder --mac"
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "peer": "^1.0.2",
+    "selfsigned": "^5.5.0"
+  },
+  "devDependencies": {
+    "electron": "38.8.6",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.airborneo.connectingyou",
+    "productName": "AirBorneo Coming Home",
+    "files": ["main.cjs", "serve.mjs", "app/**/*", "package.json"],
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "category": "public.app-category.games",
+      "identity": null
+    },
+    "dmg": { "title": "AirBorneo Coming Home" }
+  }
+}

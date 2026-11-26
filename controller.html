@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>AirBorneo Yoke</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="controller">
+    <main id="app">
+      <!-- Step 1: connect -->
+      <section id="step-connect" class="step">
+        <div class="brand-row">
+          <span class="ab-wordmark"><span class="ab-mark"></span><span>Air<b>Borneo</b></span></span>
+          <span class="ab-eyebrow">Connecting You</span>
+        </div>
+        <span class="ab-stripe"></span>
+        <h1>Your phone is the yoke. Fly them there smoothly.</h1>
+        <p class="lead">Enter the 6-digit code shown on the big screen.</p>
+        <form id="connect-form" autocomplete="off">
+          <input id="code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" spellcheck="false" maxlength="7" placeholder="6-digit code" aria-label="Pairing code" />
+          <button class="ab-btn" type="submit" id="connect-btn">Connect</button>
+        </form>
+        <p class="hint" id="connect-hint">Motion sensors and screen wake-lock will be requested.</p>
+        <p class="diag mono" id="link-diag-connect"></p>
+      </section>
+
+      <!-- Step 2: calibrate -->
+      <section id="step-calibrate" class="step hidden">
+        <div class="brand-row">
+          <span class="ab-wordmark"><span class="ab-mark"></span><span>Air<b>Borneo</b></span></span>
+          <span class="ab-chip" id="chip-cal"><span class="dot"></span><span>Connecting…</span></span>
+        </div>
+        <span class="ab-stripe"></span>
+        <div class="cal-body">
+          <svg class="yoke-illustration" viewBox="0 0 200 120" aria-hidden="true">
+            <rect x="40" y="18" width="120" height="78" rx="14" fill="#111216" />
+            <rect x="48" y="26" width="104" height="62" rx="8" fill="#ffffff" />
+            <path d="M58 70 L100 46 L142 70" fill="none" stroke="#d21f2c" stroke-width="5" stroke-linecap="round" />
+            <circle cx="30" cy="57" r="13" fill="#ffc629" />
+            <circle cx="170" cy="57" r="13" fill="#ffc629" />
+          </svg>
+          <div>
+            <h2>Hold it like a control yoke</h2>
+            <p>Landscape, both hands, screen facing you and tilted back a little. Then tap <b>Calibrate</b>.</p>
+            <p class="hint" id="sensor-hint">Waiting for motion sensors…</p>
+            <p class="diag mono" id="link-diag"></p>
+            <button class="ab-btn" id="calibrate-btn" disabled>Calibrate</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: fly -->
+      <section id="step-fly" class="step fly hidden">
+        <div class="lever-wrap" id="lever-wrap">
+          <div class="lever-labels"><span>TO</span><span>CLB</span><span>IDLE</span></div>
+          <div class="lever-track" id="lever-track">
+            <div class="lever-fill" id="lever-fill"></div>
+            <div class="lever-handle" id="lever-handle"><span id="lever-value">IDLE</span></div>
+          </div>
+          <div class="ctl-label">Throttle</div>
+        </div>
+
+        <div class="center">
+          <div class="topbar">
+            <span class="ab-chip" id="chip-fly"><span class="dot"></span><span>Connected</span></span>
+            <button class="mini" id="recal-btn" type="button">Re-centre</button>
+            <button class="mini" id="invert-btn" type="button">Pitch: inverted</button>
+          </div>
+          <canvas id="attitude" width="320" height="320" aria-label="Your tilt"></canvas>
+          <div class="prompt" id="prompt">Get ready</div>
+          <div class="score" id="score">0</div>
+        </div>
+
+        <div class="buttons">
+          <button class="big-btn" id="flaps-btn" type="button">
+            <span class="ctl-label">Flaps</span>
+            <span class="big-value" id="flaps-value">0°</span>
+          </button>
+          <button class="big-btn action" id="action-btn" type="button">
+            <span class="ctl-label">Action</span>
+            <span class="big-value small" id="action-value">Start</span>
+          </button>
+        </div>
+      </section>
+
+      <div id="rotate-overlay" class="rotate-overlay hidden">
+        <div>
+          <div class="rotate-icon">⟲</div>
+          <p>Turn your phone to landscape</p>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/controller/main.ts"></script>
+  </body>
+</html>

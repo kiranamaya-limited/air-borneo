@@ -1,0 +1,11 @@
+node_modules
+dist
+.vercel
+*.log
+.DS_Store
+e2e-shots
+.preview
+model-preview.html
+dist-offline
+dist-relaytest
+dist-relayonly
